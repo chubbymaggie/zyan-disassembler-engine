@@ -1,9 +1,16 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 2.8.3)
 
 project(VerteronDisassemblerEngine)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
 option(BUILD_EXAMPLES "Build examples" TRUE)
 option(BUILD_C_BINDINGS "Build C bindings" TRUE) # TODO: default to FALSE when ready
+option(BUILD_RUST_BINDINGS "Build Rust bindings" FALSE)
+
+if (NOT BUILD_C_BINDINGS AND BUILD_RUST_BINDINGS)
+    message(SEND_ERROR "C bindings are required in order to build rust bindings")
+endif ()
 
 if (NOT CONFIGURED_ONCE)
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR
@@ -54,6 +61,24 @@ if (BUILD_C_BINDINGS)
     target_link_libraries("VerteronDisassemblerEngineC" "VerteronDisassemblerEngine")
 endif ()
 
+# Rust bindings
+if (BUILD_RUST_BINDINGS)
+    find_package(rustc)
+    find_package(rustdoc)
+    include(Rust)
+
+    get_rust_deps("Bindings/Rust/src/lib.rs" rust_bindings_deps)
+    rust_crate("Bindings/Rust/src/lib.rs"
+               ALL
+               TARGET_NAME VerteronDisassemblerEngineRust
+               DESTINATION lib
+               DEPENDS "${rust_bindings_deps}"
+               OTHER_RUSTC_FLAGS --crate-type staticlib --crate-type rlib)
+    #add_custom_target(VerteronDisassemblerEngineRust2
+    #                  ALL 
+    #                  DEPENDS ${VerteronDisassemblerEngineRust_FULL_TARGET})
+endif ()
+
 # Examples
 if (BUILD_EXAMPLES)
     include_directories("VerteronDisassemblerEngine")
@@ -71,6 +96,10 @@ if (BUILD_EXAMPLES)
         add_executable("CBindingsTest" "Examples/CBindings/test.c")
         include_directories("Bindings/C")
         target_link_libraries("CBindingsTest" "VerteronDisassemblerEngineC")
+    endif ()
+
+    if (BUILD_RUST_BINDINGS)
+
     endif ()
 
     if (WIN32)

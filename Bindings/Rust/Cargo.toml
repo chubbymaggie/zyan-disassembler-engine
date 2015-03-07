@@ -1,0 +1,8 @@
+[package]
+
+name = "VerteronDisassemblerEngine"
+version = "1.0.0"
+authors = [ ]
+
+[lib]
+name = "lib"

@@ -189,7 +189,7 @@ typedef enum _VXRegister /* : uint16_t */
     REG_YMM0,   REG_YMM1,   REG_YMM2,   REG_YMM3,
     REG_YMM4,   REG_YMM5,   REG_YMM6,   REG_YMM7,
     REG_YMM8,   REG_YMM9,   REG_YMM10,  REG_YMM11,
-    REG_YMM12,  REG_YMM13,  REG_YMM14,  YMM15,
+    REG_YMM12,  REG_YMM13,  REG_YMM14,  REG_YMM15,
     /* instruction pointer register */
     REG_RIP,
 
