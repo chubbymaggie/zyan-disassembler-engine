@@ -1,4 +1,4 @@
-/**
+/*
  * Verteron Disassembler Engine Rust language bindings
  * 
  * The MIT License (MIT)
@@ -28,7 +28,7 @@
 #[allow(dead_code)] // TODO: remove on completion
 
 mod raw_interface {     
-    use super::super::disassembler_types;
+    use disassembler_types;
     
     extern {
         //uint64_t VDECalcAbsoluteTarget(

@@ -117,7 +117,8 @@ void VXInstructionDecoder_Release(
     VXInstructionDecoderContext *ctx);
 
 bool VXInstructionDecoder_DecodeInstruction(
-    VXInstructionDecoderContext *ctx, VXInstructionInfo *info);
+    VXInstructionDecoderContext *ctx, 
+    VXInstructionInfo *info);
 
 VXBaseDataSourceContext* VXInstructionDecoder_GetDataSource(
     const VXInstructionDecoderContext *ctx);

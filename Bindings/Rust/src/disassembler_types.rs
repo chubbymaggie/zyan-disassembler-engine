@@ -1,4 +1,4 @@
-/**
+/*
  * Verteron Disassembler Engine Rust language bindings
  * 
  * The MIT License (MIT)
@@ -24,8 +24,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
-#[allow(dead_code)] // TODO: remove on completion
 
 use opcode_table;
 

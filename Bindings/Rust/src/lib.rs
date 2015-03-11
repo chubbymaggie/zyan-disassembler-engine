@@ -1,4 +1,4 @@
-/**
+/*
  * Verteron Disassembler Engine Rust language bindings
  * 
  * The MIT License (MIT)
@@ -25,6 +25,10 @@
  * SOFTWARE.
  */
 
+#![allow(dead_code)] // TODO: remove on library completion
+#![feature(libc)]
+
 pub mod disassembler_types;
 pub mod disassembler_utils;
 pub mod opcode_table;
+pub mod instruction_decoder;
