@@ -1,96 +1,204 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 include(GenerateExportHeader)
+include(GNUInstallDirs)
 
-project(Zydis)
+project(Zydis VERSION 2.0)
 
-option(BUILD_SHARED_LIBS "Build shared libraries rather than static ones" FALSE)
-option(FORCE_SHARED_CRT 
-    "Forces shared linkage against the CRT even when building a static library" 
-    FALSE)
-option(BUILD_EXAMPLES "Build examples" TRUE)
-option(BUILD_C_BINDINGS "Build C bindings" TRUE)
+# =============================================================================================== #
+# Overridable options                                                                             #
+# =============================================================================================== #
 
-if (NOT CONFIGURED_ONCE)
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR
-            "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        set(compiler_specific "-Werror")
-        set(compiler_specific_cxx "-std=c++14")
+# Features
+option(ZYDIS_FEATURE_DECODER
+    "Enable instruction decoding and formtting functionality"
+    ON)
+#option(ZYDIS_FEATURE_ENCODER
+#    "Enable instruction encoding functionality"
+#    OFF)
+option(ZYDIS_FEATURE_EVEX 
+    "Enable support for EVEX instructions" 
+    ON)
+option(ZYDIS_FEATURE_MVEX 
+    "Enable support for MVEX instructions" 
+    ON)
+option(ZYDIS_FEATURE_FLAGS 
+    "Include information about affected flags"
+    ON)
+option(ZYDIS_FEATURE_CPUID 
+    "Include information about CPUID feature-flags"
+    OFF)
+
+# Build configuration
+option(BUILD_SHARED_LIBS
+    "Build shared libraries"
+    OFF)
+option(ZYDIS_BUILD_EXAMPLES 
+    "Build examples" 
+    ON)
+option(ZYDIS_BUILD_TOOLS 
+    "Build tools" 
+    ON)
+option(ZYDIS_DEV_MODE
+    "Enable developer mode (-Wall, -Werror, ...)"
+    OFF)
+
+# =============================================================================================== #
+# Developer mode                                                                                  #
+# =============================================================================================== #
+
+# If in developer mode, hack global compiler flags.
+if (ZYDIS_DEV_MODE)
+    set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+    if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR
+            "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" OR
+            "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
+        set(compiler_specific "-pedantic -Wextra -Werror")
     elseif (MSVC)
-        set(compiler_specific "/WX /W4 /D_CRT_SECURE_NO_WARNINGS /GR-")
+        set(compiler_specific "/WX /W4 /TC")
     endif ()
-
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${compiler_specific} ${compiler_specific_cxx}"
-        CACHE STRING "Flags used by the compiler during all build types." FORCE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${compiler_specific}"
         CACHE STRING "Flags used by the compiler during all build types." FORCE)
 endif ()
 
-# CMake always orders MSVC to build with a shared CRT. Hack CMake variables in order
-# to generate with a statically linked CRT when we build as a static library.
-if (MSVC AND NOT FORCE_SHARED_CRT)
-    set(manipulated_vars
-        CMAKE_CXX_FLAGS_DEBUG
-        CMAKE_CXX_FLAGS_MINSIZEREL
-        CMAKE_CXX_FLAGS_RELEASE
-        CMAKE_CXX_FLAGS_RELWITHDEBINFO
-        CMAKE_C_FLAGS_DEBUG
-        CMAKE_C_FLAGS_MINSIZEREL
-        CMAKE_C_FLAGS_RELEASE
-        CMAKE_C_FLAGS_RELWITHDEBINFO)
-    foreach (cur_var ${manipulated_vars})
-        string(REPLACE "/MD" "/MT" ${cur_var} "${${cur_var}}")
-    endforeach ()
+# =============================================================================================== #
+# Library configuration                                                                           #
+# =============================================================================================== #
+
+add_library("Zydis")
+
+target_include_directories("Zydis" 
+    PUBLIC "include" ${PROJECT_BINARY_DIR}
+    PRIVATE "src")
+target_compile_definitions("Zydis" PRIVATE "_CRT_SECURE_NO_WARNINGS" "ZYDIS_EXPORTS")
+generate_export_header("Zydis" BASE_NAME "ZYDIS" EXPORT_FILE_NAME "ZydisExportConfig.h")
+
+if (NOT ZYDIS_FEATURE_ENCODER AND NOT ZYDIS_FEATURE_DECODER)
+    message(
+        FATAL_ERROR
+        "\nIt's dangerous to go alone! Take at least one of these:\n"
+        "[ ] ZYDIS_FEATURE_ENCODER [ ] ZYDIS_FEATURE_DECODER"
+    )
 endif ()
 
-# Library
-set(headers
-    "Zydis/Zydis.hpp"
-    "Zydis/ZydisInstructionDecoder.hpp"
-    "Zydis/ZydisInstructionFormatter.hpp"
-    "Zydis/ZydisOpcodeTable.hpp"
-    "Zydis/ZydisSymbolResolver.hpp"
-    "Zydis/ZydisTypes.hpp"
-    "Zydis/ZydisUtils.hpp")
-set(sources
-    "Zydis/ZydisInstructionDecoder.cpp"
-    "Zydis/ZydisInstructionFormatter.cpp"
-    "Zydis/ZydisOpcodeTable.cpp"
-    "Zydis/ZydisSymbolResolver.cpp"
-    "Zydis/ZydisUtils.cpp")
+if (ZYDIS_FEATURE_EVEX)
+    target_compile_definitions("Zydis" PUBLIC "ZYDIS_ENABLE_FEATURE_EVEX")
+endif ()
+if (ZYDIS_FEATURE_MVEX)
+    target_compile_definitions("Zydis" PUBLIC "ZYDIS_ENABLE_FEATURE_MVEX")
+endif ()
+if (ZYDIS_FEATURE_FLAGS)
+    target_compile_definitions("Zydis" PUBLIC "ZYDIS_ENABLE_FEATURE_FLAGS")
+endif ()
+if (ZYDIS_FEATURE_CPUID)
+    target_compile_definitions("Zydis" PUBLIC "ZYDIS_ENABLE_FEATURE_CPUID")
+endif ()
+if (ZYDIS_FEATURE_DECODER)
+    target_compile_definitions("Zydis" PUBLIC "ZYDIS_ENABLE_FEATURE_DECODER")
+endif ()
+#if (ZYDIS_FEATURE_ENCODER)
+#    target_compile_definitions("Zydis" PUBLIC "ZYDIS_ENABLE_FEATURE_ENCODER")
+#endif ()
+
+target_sources("Zydis"
+    PUBLIC
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/CommonTypes.h"
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Defines.h"
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/MetaInfo.h"
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Mnemonic.h"
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Register.h"
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/SharedTypes.h"
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Status.h"       
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Utils.h"
+        "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Zydis.h"
+    PRIVATE
+        "src/MetaInfo.c"
+        "src/Mnemonic.c"
+        "src/Register.c"
+        "src/SharedData.h"
+        "src/SharedData.c"
+        "src/Utils.c"
+        "src/Zydis.c")
+
+if (ZYDIS_FEATURE_DECODER)
+    target_sources("Zydis" 
+        PUBLIC 
+            "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Decoder.h"
+            "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/DecoderTypes.h"
+            "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Formatter.h"
+        PRIVATE 
+            "src/DecoderData.h"
+            "src/FormatHelper.h"
+            "src/Decoder.c"
+            "src/DecoderData.c"
+            "src/Formatter.c"
+            "src/FormatHelper.c")
+endif ()
+
+#if (ZYDIS_FEATURE_ENCODER)
+#    target_sources("Zydis" 
+#        PUBLIC 
+#            "${CMAKE_CURRENT_LIST_DIR}/include/Zydis/Encoder.h" 
+#        PRIVATE 
+#            "src/EncoderData.h"
+#            "src/Encoder.c"
+#            "src/EncoderData.c")
+#endif ()
 
 if (BUILD_SHARED_LIBS AND WIN32)
-    set(sources ${sources}
-        "Zydis/VersionInfo.rc")
+    target_sources("Zydis" PRIVATE "src/VersionInfo.rc")
 endif ()
 
-if (BUILD_C_BINDINGS)
-    set(headers ${headers}
-        "Zydis/ZydisAPI.h")
-    set(sources ${sources}
-        "Zydis/ZydisAPI.cpp")
-endif ()
+# TODO: Install CMake config.
+install(TARGETS "Zydis"
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY "include" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-add_library("Zydis" ${headers} ${sources})
-set_target_properties("Zydis" PROPERTIES COMPILE_DEFINITIONS "Zydis_EXPORTS")
-generate_export_header(
-    "Zydis" 
-    BASE_NAME "ZYDIS"
-    EXPORT_FILE_NAME "ZydisExportConfig.h")
-include_directories(${PROJECT_BINARY_DIR})
+# =============================================================================================== #
+# Examples                                                                                        #
+# =============================================================================================== #
 
-# Examples
-if (BUILD_EXAMPLES)
-    include_directories("Zydis")
+if (ZYDIS_BUILD_EXAMPLES)
+    if (ZYDIS_FEATURE_DECODER)
+        add_executable("FormatterHooks" 
+            "examples/FormatterHooks.c"
+            "examples/FormatHelper.h")
+        target_link_libraries("FormatterHooks" "Zydis")
+        set_target_properties("FormatterHooks" PROPERTIES FOLDER "Examples/Formatter")
+        target_compile_definitions("FormatterHooks" PRIVATE "_CRT_SECURE_NO_WARNINGS")
 
-    add_executable("SimpleDemo_CPP" "Examples/CPP/SimpleDemo/SimpleDemo.cpp")
-    target_link_libraries("SimpleDemo_CPP" "Zydis")
-    add_executable("CustomDataSource_CPP" "Examples/CPP/CustomDataSource/CustomDataSource.cpp")
-    target_link_libraries("CustomDataSource_CPP" "Zydis")
+        add_executable("ZydisFuzzIn" "examples/ZydisFuzzIn.c")
+        target_link_libraries("ZydisFuzzIn" "Zydis")
+        set_target_properties("FormatterHooks" PROPERTIES FOLDER "Examples")
+        target_compile_definitions("ZydisFuzzIn" PRIVATE "_CRT_SECURE_NO_WARNINGS")
 
-    if (BUILD_C_BINDINGS)
-        add_executable("SimpleDemo_C" "Examples/C/SimpleDemo/SimpleDemo.c")
-        target_link_libraries("SimpleDemo_C" "Zydis")
+        add_executable("ZydisPerfTest" "examples/ZydisPerfTest.c")
+        target_link_libraries("ZydisPerfTest" "Zydis")
+        set_target_properties("FormatterHooks" PROPERTIES FOLDER "Examples")
+        target_compile_definitions("ZydisPerfTest" PRIVATE "_CRT_SECURE_NO_WARNINGS")
+        if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+            target_compile_definitions("ZydisPerfTest" PRIVATE "_GNU_SOURCE")
+            find_package(Threads REQUIRED)
+            target_link_libraries("ZydisPerfTest" Threads::Threads)
+        endif ()
     endif ()
 endif ()
 
-set(CONFIGURED_ONCE TRUE CACHE INTERNAL "CMake has configured at least once.")
+# =============================================================================================== #
+# Tools                                                                                           #
+# =============================================================================================== #
+
+if (ZYDIS_BUILD_TOOLS)
+    if (ZYDIS_FEATURE_DECODER)
+        add_executable("ZydisDisasm" "tools/ZydisDisasm.c")
+        target_link_libraries("ZydisDisasm" "Zydis")
+        set_target_properties ("ZydisDisasm" PROPERTIES FOLDER "Tools")
+        target_compile_definitions("ZydisDisasm" PRIVATE "_CRT_SECURE_NO_WARNINGS")
+
+        add_executable("ZydisInfo" "tools/ZydisInfo.c")
+        target_link_libraries("ZydisInfo" "Zydis")
+        set_target_properties ("ZydisInfo" PROPERTIES FOLDER "Tools")
+        target_compile_definitions("ZydisInfo" PRIVATE "_CRT_SECURE_NO_WARNINGS")
+    endif ()
+endif ()
