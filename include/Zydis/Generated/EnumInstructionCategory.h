@@ -1,7 +1,7 @@
 /**
  * @brief   Defines the `ZydisInstructionCategory` datatype.
  */
-typedef uint8_t ZydisInstructionCategory;
+typedef ZydisU8 ZydisInstructionCategory;
 
 /**
  * @brief   Values that represent `ZydisInstructionCategory` elements.
@@ -9,6 +9,7 @@ typedef uint8_t ZydisInstructionCategory;
 enum ZydisInstructionCategories
 {
     ZYDIS_CATEGORY_INVALID,
+    ZYDIS_CATEGORY_ADOX_ADCX,
     ZYDIS_CATEGORY_AES,
     ZYDIS_CATEGORY_AMD3DNOW,
     ZYDIS_CATEGORY_AVX,
@@ -17,8 +18,8 @@ enum ZydisInstructionCategories
     ZYDIS_CATEGORY_AVX512,
     ZYDIS_CATEGORY_AVX512_4FMAPS,
     ZYDIS_CATEGORY_AVX512_4VNNIW,
+    ZYDIS_CATEGORY_AVX512_BITALG,
     ZYDIS_CATEGORY_AVX512_VBMI,
-    ZYDIS_CATEGORY_BDW,
     ZYDIS_CATEGORY_BINARY,
     ZYDIS_CATEGORY_BITBYTE,
     ZYDIS_CATEGORY_BLEND,
@@ -42,6 +43,7 @@ enum ZydisInstructionCategories
     ZYDIS_CATEGORY_FLAGOP,
     ZYDIS_CATEGORY_FMA4,
     ZYDIS_CATEGORY_GATHER,
+    ZYDIS_CATEGORY_GFNI,
     ZYDIS_CATEGORY_IFMA,
     ZYDIS_CATEGORY_INTERRUPT,
     ZYDIS_CATEGORY_IO,
@@ -58,12 +60,14 @@ enum ZydisInstructionCategories
     ZYDIS_CATEGORY_MPX,
     ZYDIS_CATEGORY_NOP,
     ZYDIS_CATEGORY_PCLMULQDQ,
+    ZYDIS_CATEGORY_PCONFIG,
     ZYDIS_CATEGORY_PKU,
     ZYDIS_CATEGORY_POP,
     ZYDIS_CATEGORY_PREFETCH,
     ZYDIS_CATEGORY_PREFETCHWT1,
     ZYDIS_CATEGORY_PT,
     ZYDIS_CATEGORY_PUSH,
+    ZYDIS_CATEGORY_RDPID,
     ZYDIS_CATEGORY_RDRAND,
     ZYDIS_CATEGORY_RDSEED,
     ZYDIS_CATEGORY_RDWRFSGS,
@@ -86,14 +90,23 @@ enum ZydisInstructionCategories
     ZYDIS_CATEGORY_TBM,
     ZYDIS_CATEGORY_UFMA,
     ZYDIS_CATEGORY_UNCOND_BR,
+    ZYDIS_CATEGORY_VAES,
+    ZYDIS_CATEGORY_VBMI2,
     ZYDIS_CATEGORY_VFMA,
+    ZYDIS_CATEGORY_VPCLMULQDQ,
     ZYDIS_CATEGORY_VTX,
     ZYDIS_CATEGORY_WIDENOP,
     ZYDIS_CATEGORY_X87_ALU,
     ZYDIS_CATEGORY_XOP,
     ZYDIS_CATEGORY_XSAVE,
-    ZYDIS_CATEGORY_XSAVEOPT
-};
+    ZYDIS_CATEGORY_XSAVEOPT,
 
-#define ZYDIS_CATEGORY_MAX_VALUE ZYDIS_CATEGORY_XSAVEOPT
-#define ZYDIS_CATEGORY_MAX_BITS  0x0007
+    /**
+     * @brief   Maximum value of this enum.
+     */
+    ZYDIS_CATEGORY_MAX_VALUE = ZYDIS_CATEGORY_XSAVEOPT,
+    /**
+     * @brief   Minimum amount of bits required to store a value of this enum.
+     */
+    ZYDIS_CATEGORY_MIN_BITS  = 0x0007
+};

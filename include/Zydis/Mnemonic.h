@@ -32,8 +32,8 @@
 #ifndef ZYDIS_MNEMONIC_H
 #define ZYDIS_MNEMONIC_H
 
-#include <Zydis/Defines.h>
 #include <Zydis/CommonTypes.h>
+#include <Zydis/String.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +43,7 @@ extern "C" {
 /* Enums and types                                                                                */
 /* ============================================================================================== */
 
-#include <Zydis/Generated/EnumMnemonic.h>    
+#include <Zydis/Generated/EnumMnemonic.h>
 
 /* ============================================================================================== */
 /* Exported functions                                                                             */
@@ -51,12 +51,23 @@ extern "C" {
 
 /**
  * @brief   Returns the specified instruction mnemonic string.
- *          
+ *
  * @param   mnemonic    The mnemonic.
- *                      
+ *
  * @return  The instruction mnemonic string or @c NULL, if an invalid mnemonic was passed.
  */
 ZYDIS_EXPORT const char* ZydisMnemonicGetString(ZydisMnemonic mnemonic);
+
+/**
+ * @brief   Returns the specified instruction mnemonic as `ZydisStaticString`.
+ *
+ * @param   mnemonic    The mnemonic.
+ *
+ * @return  The instruction mnemonic string or @c NULL, if an invalid mnemonic was passed.
+ *
+ * The `buffer` of the returned struct is guaranteed to be zero-terminated in this special case.
+ */
+ZYDIS_EXPORT const ZydisStaticString* ZydisMnemonicGetStaticString(ZydisMnemonic mnemonic);
 
 /* ============================================================================================== */
 

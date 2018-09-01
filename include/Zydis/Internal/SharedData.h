@@ -24,8 +24,8 @@
 
 ***************************************************************************************************/
 
-#ifndef ZYDIS_SHAREDDATA_H
-#define ZYDIS_SHAREDDATA_H
+#ifndef ZYDIS_INTERNAL_SHAREDDATA_H
+#define ZYDIS_INTERNAL_SHAREDDATA_H
 
 #include <Zydis/Defines.h>
 #include <Zydis/Mnemonic.h>
@@ -56,7 +56,7 @@ extern "C" {
 /**
  * @brief   Defines the @c ZydisSemanticOperandType datatype.
  */
-typedef uint8_t ZydisSemanticOperandType;
+typedef ZydisU8 ZydisSemanticOperandType;
 
 /**
  * @brief   Values that represent semantic operand-types.
@@ -71,9 +71,9 @@ enum ZydisSemanticOperandTypes
     ZYDIS_SEMANTIC_OPTYPE_GPR16,
     ZYDIS_SEMANTIC_OPTYPE_GPR32,
     ZYDIS_SEMANTIC_OPTYPE_GPR64,
-    ZYDIS_SEMANTIC_OPTYPE_GPR16_32_64, 
+    ZYDIS_SEMANTIC_OPTYPE_GPR16_32_64,
     ZYDIS_SEMANTIC_OPTYPE_GPR32_32_64,
-    ZYDIS_SEMANTIC_OPTYPE_GPR16_32_32, 
+    ZYDIS_SEMANTIC_OPTYPE_GPR16_32_32,
     ZYDIS_SEMANTIC_OPTYPE_FPR,
     ZYDIS_SEMANTIC_OPTYPE_MMX,
     ZYDIS_SEMANTIC_OPTYPE_XMM,
@@ -92,13 +92,14 @@ enum ZydisSemanticOperandTypes
     ZYDIS_SEMANTIC_OPTYPE_REL,
     ZYDIS_SEMANTIC_OPTYPE_PTR,
     ZYDIS_SEMANTIC_OPTYPE_AGEN,
-    ZYDIS_SEMANTIC_OPTYPE_MOFFS    
+    ZYDIS_SEMANTIC_OPTYPE_MOFFS,
+    ZYDIS_SEMANTIC_OPTYPE_MIB
 };
 
 /**
  * @brief   Defines the @c ZydisInternalElementType datatype.
  */
-typedef uint8_t ZydisInternalElementType;
+typedef ZydisU8 ZydisInternalElementType;
 
 /**
  * @brief   Values that represent internal element-types.
@@ -136,25 +137,24 @@ typedef struct ZydisOperandDefinition_
     ZydisSemanticOperandType type           ZYDIS_BITFIELD(5);
     ZydisOperandVisibility visibility       ZYDIS_BITFIELD(2);
     ZydisOperandAction action               ZYDIS_BITFIELD(3);
-    uint16_t size[3];
+    ZydisU16 size[3];
     ZydisInternalElementType elementType    ZYDIS_BITFIELD(5);
     union
     {
-        ZydisOperandEncoding encoding; 
+        ZydisOperandEncoding encoding;
         struct
         {
-            uint8_t type                    ZYDIS_BITFIELD(3);
+            ZydisU8 type                    ZYDIS_BITFIELD(3);
             union
             {
-                ZydisRegister reg;
-                uint8_t id                  ZYDIS_BITFIELD(6);
+                ZydisRegister reg           ZYDIS_BITFIELD(ZYDIS_REGISTER_MIN_BITS);
+                ZydisU8 id                  ZYDIS_BITFIELD(6);
             } reg;
         } reg;
-        struct 
+        struct
         {
-            uint8_t seg                     ZYDIS_BITFIELD(3);
-            uint8_t base                    ZYDIS_BITFIELD(3); 
-            ZydisOperandAction baseAction   ZYDIS_BITFIELD(3);
+            ZydisU8 seg                     ZYDIS_BITFIELD(3);
+            ZydisU8 base                    ZYDIS_BITFIELD(3);
         } mem;
     } op;
 } ZydisOperandDefinition;
@@ -179,9 +179,10 @@ enum ZydisImplicitRegisterType
 enum ZydisImplicitMemBase
 {
     ZYDIS_IMPLMEM_BASE_ABX,
+    ZYDIS_IMPLMEM_BASE_ASP,
     ZYDIS_IMPLMEM_BASE_ABP,
     ZYDIS_IMPLMEM_BASE_ASI,
-    ZYDIS_IMPLMEM_BASE_ADI    
+    ZYDIS_IMPLMEM_BASE_ADI
 };
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -189,9 +190,36 @@ enum ZydisImplicitMemBase
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
+ * @brief   Defines the `ZydisRegisterConstraint` datatype.
+ */
+typedef ZydisU8 ZydisRegisterConstraint;
+
+/**
+ * @brief   Values that represent register-constraints.
+ */
+enum ZydisRegisterConstraints
+{
+    ZYDIS_REG_CONSTRAINTS_UNUSED,
+    ZYDIS_REG_CONSTRAINTS_NONE,
+    ZYDIS_REG_CONSTRAINTS_GPR,
+    ZYDIS_REG_CONSTRAINTS_SR_DEST,
+    ZYDIS_REG_CONSTRAINTS_SR,
+    ZYDIS_REG_CONSTRAINTS_CR,
+    ZYDIS_REG_CONSTRAINTS_DR,
+    ZYDIS_REG_CONSTRAINTS_MASK,
+    ZYDIS_REG_CONSTRAINTS_BND,
+    ZYDIS_REG_CONSTRAINTS_VSIB,
+
+    ZYDIS_REG_CONSTRAINTS_MAX_VALUE = ZYDIS_REG_CONSTRAINTS_VSIB,
+    ZYDIS_REG_CONSTRAINTS_MIN_BITS  = 4
+};
+
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
  * @brief   Defines the @c ZydisInternalVectorLength datatype.
  */
-typedef uint8_t ZydisInternalVectorLength;
+typedef ZydisU8 ZydisInternalVectorLength;
 
 /**
  * @brief   Values that represent internal vector-lengths.
@@ -209,7 +237,7 @@ enum ZydisInternalVectorLengths
 /**
  * @brief   Defines the @c ZydisInternalElementSize datatype.
  */
-typedef uint8_t ZydisInternalElementSize;
+typedef ZydisU8 ZydisInternalElementSize;
 
 /**
  * @brief   Values that represent internal element-sizes.
@@ -220,7 +248,10 @@ enum ZydisInternalElementSizes
     ZYDIS_IELEMENT_SIZE_8,
     ZYDIS_IELEMENT_SIZE_16,
     ZYDIS_IELEMENT_SIZE_32,
-    ZYDIS_IELEMENT_SIZE_64
+    ZYDIS_IELEMENT_SIZE_64,
+    ZYDIS_IELEMENT_SIZE_128,
+
+    ZYDIS_IELEMENT_SIZE_MAX_VALUE = ZYDIS_IELEMENT_SIZE_128
 };
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -228,7 +259,7 @@ enum ZydisInternalElementSizes
 /**
  * @brief   Defines the @c ZydisEVEXFunctionality datatype.
  */
-typedef uint8_t ZydisEVEXFunctionality;
+typedef ZydisU8 ZydisEVEXFunctionality;
 
 /**
  * @brief   Values that represent EVEX-functionalities.
@@ -255,7 +286,7 @@ enum ZydisEVEXFunctionalities
 /**
  * @brief   Defines the @c ZydisEVEXTupleType datatype.
  */
-typedef uint8_t ZydisEVEXTupleType;
+typedef ZydisU8 ZydisEVEXTupleType;
 
 /**
  * @brief   Values that represent EVEX tuple-types.
@@ -330,7 +361,7 @@ enum ZydisEVEXTupleTypes
 /**
  * @brief   Defines the @c ZydisMVEXFunctionality datatype.
  */
-typedef uint8_t ZydisMVEXFunctionality;
+typedef ZydisU8 ZydisMVEXFunctionality;
 
 /**
  * @brief   Values that represent MVEX-functionalities.
@@ -448,7 +479,7 @@ enum ZydisMVEXFunctionalities
 /**
  * @brief   Defines the @c ZydisVEXStaticBroadcast datatype.
  */
-typedef uint8_t ZydisVEXStaticBroadcast;
+typedef ZydisU8 ZydisVEXStaticBroadcast;
 
 /**
  * @brief   Values that represent static VEX-broadcasts.
@@ -458,10 +489,12 @@ enum ZydisVEXStaticBroadcasts
     ZYDIS_VEX_STATIC_BROADCAST_NONE,
     ZYDIS_VEX_STATIC_BROADCAST_1_TO_2,
     ZYDIS_VEX_STATIC_BROADCAST_1_TO_4,
-    ZYDIS_VEX_STATIC_BROADCAST_1_TO_8,  
+    ZYDIS_VEX_STATIC_BROADCAST_1_TO_8,
     ZYDIS_VEX_STATIC_BROADCAST_1_TO_16,
     ZYDIS_VEX_STATIC_BROADCAST_1_TO_32,
-    ZYDIS_VEX_STATIC_BROADCAST_2_TO_4   
+    ZYDIS_VEX_STATIC_BROADCAST_2_TO_4,
+
+    ZYDIS_VEX_STATIC_BROADCAST_MAX_VALUE = ZYDIS_VEX_STATIC_BROADCAST_2_TO_4
 };
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -469,7 +502,7 @@ enum ZydisVEXStaticBroadcasts
 /**
  * @brief   Defines the @c ZydisEVEXStaticBroadcast datatype.
  */
-typedef uint8_t ZydisEVEXStaticBroadcast;
+typedef ZydisU8 ZydisEVEXStaticBroadcast;
 
 /**
  * @brief   Values that represent static EVEX-broadcasts.
@@ -488,7 +521,9 @@ enum ZydisEVEXStaticBroadcasts
     ZYDIS_EVEX_STATIC_BROADCAST_2_TO_16,
     ZYDIS_EVEX_STATIC_BROADCAST_4_TO_8,
     ZYDIS_EVEX_STATIC_BROADCAST_4_TO_16,
-    ZYDIS_EVEX_STATIC_BROADCAST_8_TO_16   
+    ZYDIS_EVEX_STATIC_BROADCAST_8_TO_16,
+
+    ZYDIS_EVEX_STATIC_BROADCAST_MAX_VALUE = ZYDIS_EVEX_STATIC_BROADCAST_8_TO_16
 };
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -496,7 +531,7 @@ enum ZydisEVEXStaticBroadcasts
 /**
  * @brief   Defines the @c ZydisMVEXStaticBroadcast datatype.
  */
-typedef uint8_t ZydisMVEXStaticBroadcast;
+typedef ZydisU8 ZydisMVEXStaticBroadcast;
 
 /**
  * @brief   Values that represent static MVEX-broadcasts.
@@ -515,7 +550,7 @@ enum ZydisMVEXStaticBroadcasts
 /**
  * @brief   Defines the @c ZydisMaskPolicy datatype.
  */
-typedef uint8_t ZydisMaskPolicy;
+typedef ZydisU8 ZydisMaskPolicy;
 
 /**
  * @brief   Values that represent AVX mask policies.
@@ -541,39 +576,45 @@ enum ZydisMaskPolicies
 /* ---------------------------------------------------------------------------------------------- */
 
 #define ZYDIS_INSTRUCTION_DEFINITION_BASE \
-    ZydisMnemonic mnemonic                  ZYDIS_BITFIELD(ZYDIS_MNEMONIC_MAX_BITS); \
-    uint8_t operandCount                    ZYDIS_BITFIELD( 4); \
-    uint16_t operandReference               ZYDIS_BITFIELD(15); \
-    uint8_t operandSizeMap                  ZYDIS_BITFIELD( 3); \
-    uint8_t flagsReference                  ZYDIS_BITFIELD( 7); \
+    ZydisMnemonic mnemonic                  ZYDIS_BITFIELD(ZYDIS_MNEMONIC_MIN_BITS); \
+    ZydisU8 operandCount                    ZYDIS_BITFIELD( 4); \
+    ZydisU16 operandReference               ZYDIS_BITFIELD(15); \
+    ZydisU8 operandSizeMap                  ZYDIS_BITFIELD( 3); \
+    ZydisU8 flagsReference                  ZYDIS_BITFIELD( 7); \
+    ZydisBool requiresProtectedMode         ZYDIS_BITFIELD( 1); \
     ZydisBool acceptsAddressSizeOverride    ZYDIS_BITFIELD( 1); \
-    ZydisInstructionCategory category       ZYDIS_BITFIELD(ZYDIS_CATEGORY_MAX_BITS); \
-    ZydisISASet isaSet                      ZYDIS_BITFIELD(ZYDIS_ISA_SET_MAX_BITS); \
-    ZydisISAExt isaExt                      ZYDIS_BITFIELD(ZYDIS_ISA_EXT_MAX_BITS); \
-    ZydisExceptionClass exceptionClass      ZYDIS_BITFIELD( 6)
+    ZydisInstructionCategory category       ZYDIS_BITFIELD(ZYDIS_CATEGORY_MIN_BITS); \
+    ZydisISASet isaSet                      ZYDIS_BITFIELD(ZYDIS_ISA_SET_MIN_BITS); \
+    ZydisISAExt isaExt                      ZYDIS_BITFIELD(ZYDIS_ISA_EXT_MIN_BITS); \
+    ZydisExceptionClass exceptionClass      ZYDIS_BITFIELD( 6); \
+    ZydisRegisterConstraint constrREG       ZYDIS_BITFIELD(ZYDIS_REG_CONSTRAINTS_MIN_BITS); \
+    ZydisRegisterConstraint constrRM        ZYDIS_BITFIELD(ZYDIS_REG_CONSTRAINTS_MIN_BITS)
 
 #define ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR \
     ZYDIS_INSTRUCTION_DEFINITION_BASE; \
-    ZydisBool hasNDSNDDOperand              ZYDIS_BITFIELD( 1)
+    ZydisRegisterConstraint constrNDSNDD    ZYDIS_BITFIELD(ZYDIS_REG_CONSTRAINTS_MIN_BITS)
 
-#define ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR_EX \
+#define ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR_INTEL \
     ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR; \
-    ZydisBool hasVSIB                       ZYDIS_BITFIELD( 1)
+    ZydisBool isGather                      ZYDIS_BITFIELD( 1)
 
 /**
- * @brief   Defines the @c ZydisInstructionDefinition struct.
+ * @brief   Defines the `ZydisInstructionDefinition` struct.
  */
 typedef struct ZydisInstructionDefinition_
 {
     ZYDIS_INSTRUCTION_DEFINITION_BASE;
 } ZydisInstructionDefinition;
 
+/**
+ * @brief   Defines the `ZydisInstructionDefinitionDEFAULT` struct.
+ */
 typedef struct ZydisInstructionDefinitionDEFAULT_
 {
     ZYDIS_INSTRUCTION_DEFINITION_BASE;
     ZydisBool isPrivileged                  ZYDIS_BITFIELD( 1);
     ZydisBool isFarBranch                   ZYDIS_BITFIELD( 1);
-    ZydisBool acceptsLock                   ZYDIS_BITFIELD( 1);
+    ZydisBool acceptsLOCK                   ZYDIS_BITFIELD( 1);
     ZydisBool acceptsREP                    ZYDIS_BITFIELD( 1);
     ZydisBool acceptsREPEREPZ               ZYDIS_BITFIELD( 1);
     ZydisBool acceptsREPNEREPNZ             ZYDIS_BITFIELD( 1);
@@ -585,43 +626,62 @@ typedef struct ZydisInstructionDefinitionDEFAULT_
     ZydisBool acceptsSegment                ZYDIS_BITFIELD( 1);
 } ZydisInstructionDefinitionDEFAULT;
 
+/**
+ * @brief   Defines the `ZydisInstructionDefinition3DNOW` struct.
+ */
 typedef struct ZydisInstructionDefinition3DNOW_
 {
     ZYDIS_INSTRUCTION_DEFINITION_BASE;
 } ZydisInstructionDefinition3DNOW;
 
+/**
+ * @brief   Defines the `ZydisInstructionDefinitionXOP` struct.
+ */
 typedef struct ZydisInstructionDefinitionXOP_
 {
     ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR;
 } ZydisInstructionDefinitionXOP;
 
+/**
+ * @brief   Defines the `ZydisInstructionDefinitionVEX` struct.
+ */
 typedef struct ZydisInstructionDefinitionVEX_
 {
-    ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR;
+    ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR_INTEL;
     ZydisVEXStaticBroadcast broadcast       ZYDIS_BITFIELD( 3);
 } ZydisInstructionDefinitionVEX;
 
+#ifndef ZYDIS_DISABLE_EVEX
+/**
+ * @brief   Defines the `ZydisInstructionDefinitionEVEX` struct.
+ */
 typedef struct ZydisInstructionDefinitionEVEX_
 {
-    ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR_EX;
+    ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR_INTEL;
     ZydisInternalVectorLength vectorLength  ZYDIS_BITFIELD( 2);
     ZydisEVEXTupleType tupleType            ZYDIS_BITFIELD( 4);
-    ZydisInternalElementSize elementSize    ZYDIS_BITFIELD( 4);
+    ZydisInternalElementSize elementSize    ZYDIS_BITFIELD( 3);
     ZydisEVEXFunctionality functionality    ZYDIS_BITFIELD( 2);
     ZydisMaskPolicy maskPolicy              ZYDIS_BITFIELD( 2);
     ZydisBool acceptsZeroMask               ZYDIS_BITFIELD( 1);
     ZydisBool isControlMask                 ZYDIS_BITFIELD( 1);
     ZydisEVEXStaticBroadcast broadcast      ZYDIS_BITFIELD( 4);
-} ZydisInstructionDefinitionEVEX;                           
+} ZydisInstructionDefinitionEVEX;
+#endif
 
+#ifndef ZYDIS_DISABLE_MVEX
+/**
+ * @brief   Defines the `ZydisInstructionDefinitionMVEX` struct.
+ */
 typedef struct ZydisInstructionDefinitionMVEX_
 {
-    ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR_EX;
+    ZYDIS_INSTRUCTION_DEFINITION_BASE_VECTOR_INTEL;
     ZydisMVEXFunctionality functionality    ZYDIS_BITFIELD( 5);
     ZydisMaskPolicy maskPolicy              ZYDIS_BITFIELD( 2);
     ZydisBool hasElementGranularity         ZYDIS_BITFIELD( 1);
     ZydisMVEXStaticBroadcast broadcast      ZYDIS_BITFIELD( 3);
 } ZydisInstructionDefinitionMVEX;
+#endif
 
 /* ---------------------------------------------------------------------------------------------- */
 /* Accessed CPU flags                                                                             */
@@ -657,7 +717,7 @@ typedef struct ZydisAccessedFlags_
  *                      definition.
  */
 ZYDIS_NO_EXPORT void ZydisGetInstructionDefinition(ZydisInstructionEncoding encoding,
-    uint16_t id, const ZydisInstructionDefinition** definition);
+    ZydisU16 id, const ZydisInstructionDefinition** definition);
 
 /* ---------------------------------------------------------------------------------------------- */
 /* Operand definition                                                                             */
@@ -669,10 +729,10 @@ ZYDIS_NO_EXPORT void ZydisGetInstructionDefinition(ZydisInstructionEncoding enco
  * @param   definition  A pointer to the instruction-definition.
  * @param   operand     A pointer to the variable that receives a pointer to the first operand-
  *                      definition of the instruction.
- *                          
+ *
  * @return  The number of operands for the given instruction-definition.
  */
-ZYDIS_NO_EXPORT uint8_t ZydisGetOperandDefinitions(const ZydisInstructionDefinition* definition, 
+ZYDIS_NO_EXPORT ZydisU8 ZydisGetOperandDefinitions(const ZydisInstructionDefinition* definition,
     const ZydisOperandDefinition** operand);
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -710,4 +770,4 @@ ZYDIS_NO_EXPORT void ZydisGetAccessedFlags(const ZydisInstructionDefinition* def
 }
 #endif
 
-#endif /* ZYDIS_SHAREDDATA_H */
+#endif /* ZYDIS_INTERNAL_SHAREDDATA_H */

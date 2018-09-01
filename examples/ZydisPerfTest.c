@@ -1,6 +1,6 @@
 /***************************************************************************************************
 
-  Zyan Disassembler Engine (Zydis)
+  Zyan Disassembler Library (Zydis)
 
   Original Author : Florian Bernd
 
@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <time.h>
 #include <Zydis/Zydis.h>
+#include <inttypes.h>
 
 #if defined(ZYDIS_WINDOWS)
 #   include <Windows.h>
@@ -40,6 +41,10 @@
 #elif defined(ZYDIS_LINUX)
 #   include <sys/time.h>
 #   include <pthread.h>
+#elif defined(ZYDIS_FREEBSD)
+#   include <sys/time.h>
+#   include <pthread.h>
+#   include <pthread_np.h>
 #else
 #   error "Unsupported platform detected"
 #endif
@@ -94,7 +99,7 @@ double GetCounter()
 
     return (double)elapsed * timebaseInfo.numer / timebaseInfo.denom / 1000000;
 }
-#elif defined(ZYDIS_LINUX)
+#elif defined(ZYDIS_LINUX) || defined(ZYDIS_FREEBSD)
 struct timeval t1;
 
 void StartCounter()
@@ -137,9 +142,15 @@ void adjustProcessAndThreadPriority()
         }
     }
 #endif
-#ifdef ZYDIS_LINUX
+#if defined(ZYDIS_LINUX)
     pthread_t thread = pthread_self();
     cpu_set_t cpus;
+    CPU_ZERO(&cpus);
+    CPU_SET(0, &cpus);
+    pthread_setaffinity_np(thread, sizeof(cpus), &cpus);
+#elif defined(ZYDIS_FREEBSD)
+    pthread_t thread = pthread_self();
+    cpuset_t cpus;
     CPU_ZERO(&cpus);
     CPU_SET(0, &cpus);
     pthread_setaffinity_np(thread, sizeof(cpus), &cpus);
@@ -152,26 +163,32 @@ void adjustProcessAndThreadPriority()
 /* Internal functions                                                                             */
 /* ============================================================================================== */
 
-uint64_t processBuffer(const char* buffer, size_t length, ZydisDecodeGranularity granularity, 
-    ZydisBool format)
+uint64_t processBuffer(const char* buffer, size_t length, ZydisBool minimalMode, ZydisBool format)
 {
     ZydisDecoder decoder;
-    if (!ZYDIS_SUCCESS(ZydisDecoderInitEx(&decoder, 
-        ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64, granularity)))
+    if (!ZYDIS_SUCCESS(
+        ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64)))
     {
         fputs("Failed to initialize decoder\n", stderr);
+        exit(EXIT_FAILURE);
+    }
+    if (!ZYDIS_SUCCESS(
+        ZydisDecoderEnableMode(&decoder, ZYDIS_DECODER_MODE_MINIMAL, minimalMode)))
+    {
+        fputs("Failed to adjust decoder-mode\n", stderr);
         exit(EXIT_FAILURE);
     }
 
     ZydisFormatter formatter;
     if (format)
     {
-        if (!ZYDIS_SUCCESS(ZydisFormatterInitEx(&formatter, ZYDIS_FORMATTER_STYLE_INTEL, 
-            ZYDIS_FMTFLAG_FORCE_SEGMENTS | ZYDIS_FMTFLAG_FORCE_OPERANDSIZE,
-            ZYDIS_FORMATTER_ADDR_ABSOLUTE, ZYDIS_FORMATTER_DISP_DEFAULT, 
-            ZYDIS_FORMATTER_IMM_DEFAULT)))
+        if (!ZYDIS_SUCCESS(ZydisFormatterInit(&formatter, ZYDIS_FORMATTER_STYLE_INTEL)) ||
+            !ZYDIS_SUCCESS(ZydisFormatterSetProperty(&formatter,
+                ZYDIS_FORMATTER_PROP_FORCE_MEMSEG, ZYDIS_TRUE)) ||
+            !ZYDIS_SUCCESS(ZydisFormatterSetProperty(&formatter,
+                ZYDIS_FORMATTER_PROP_FORCE_MEMSIZE, ZYDIS_TRUE)))
         {
-            fputs("Failed to initialized instruction-formatter\n", stderr);
+            fputs("Failed to initialize instruction-formatter\n", stderr);
             exit(EXIT_FAILURE);
         }
     }
@@ -181,7 +198,7 @@ uint64_t processBuffer(const char* buffer, size_t length, ZydisDecodeGranularity
     ZydisStatus status;
     ZydisDecodedInstruction instruction;
     char formatBuffer[256];
-    while ((status = ZydisDecoderDecodeBuffer(&decoder, buffer + offset, length - offset, offset, 
+    while ((status = ZydisDecoderDecodeBuffer(&decoder, buffer + offset, length - offset, offset,
         &instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
     {
         ZYDIS_ASSERT(ZYDIS_SUCCESS(status));
@@ -195,28 +212,27 @@ uint64_t processBuffer(const char* buffer, size_t length, ZydisDecodeGranularity
         {
             ZydisFormatterFormatInstruction(
                 &formatter, &instruction, formatBuffer, sizeof(formatBuffer));
-        }            
+        }
         offset += instruction.length;
-    } 
-    
+    }
+
     return count;
 }
 
-void testPerformance(const char* buffer, size_t length, ZydisDecodeGranularity granularity, 
-    ZydisBool format)
+void testPerformance(const char* buffer, size_t length, ZydisBool minimalMode, ZydisBool format)
 {
     // Cache warmup
-    processBuffer(buffer, length, granularity, format);
+    processBuffer(buffer, length, minimalMode, format);
 
     // Testing
     uint64_t count = 0;
     StartCounter();
     for (uint8_t j = 0; j < 100; ++j)
     {
-        count += processBuffer(buffer, length, granularity, format);
+        count += processBuffer(buffer, length, minimalMode, format);
     }
-    printf("Granularity %d, Formatting %d, Instructions: %6.2fM, Time: %8.2f msec\n", 
-        granularity, format, (double)count / 1000000, GetCounter());  
+    printf("Minimal-Mode %d, Formatting %d, Instructions: %6.2fM, Time: %8.2f msec\n",
+        minimalMode, format, (double)count / 1000000, GetCounter());
 }
 
 void generateTestData(FILE* file, uint8_t encoding)
@@ -228,7 +244,7 @@ void generateTestData(FILE* file, uint8_t encoding)
         fputs("Failed to initialize decoder\n", stderr);
         exit(EXIT_FAILURE);
     }
-    
+
     uint8_t last = 0;
     uint32_t count = 0;
     ZydisDecodedInstruction instruction;
@@ -239,7 +255,7 @@ void generateTestData(FILE* file, uint8_t encoding)
         {
             data[i] = rand() % 256;
         }
-        uint8_t offset = rand() % (ZYDIS_MAX_INSTRUCTION_LENGTH - 2);
+        const uint8_t offset = rand() % (ZYDIS_MAX_INSTRUCTION_LENGTH - 2);
         switch (encoding)
         {
         case 0:
@@ -296,13 +312,13 @@ void generateTestData(FILE* file, uint8_t encoding)
                 fwrite(&instruction.data[0], 1, instruction.length, file);
                 ++count;
 
-                uint8_t p = (uint8_t)((double)count / 100000 * 100);
+                const uint8_t p = (uint8_t)((double)count / 100000 * 100);
                 if (last < p)
                 {
                     last = p;
                     printf("%3.0d%%\n", p);
                 }
-                
+
             }
         }
     }
@@ -331,7 +347,7 @@ int main(int argc, char** argv)
     {
         generate = ZYDIS_TRUE;
     }
-    const char* directory = argv[2]; 
+    const char* directory = argv[2];
 
     static const struct
     {
@@ -347,25 +363,26 @@ int main(int argc, char** argv)
         { "EVEX"   , "enc_evex.dat"    },
         { "MVEX"   , "enc_mvex.dat"    }
     };
-    
+
     if (generate)
     {
         time_t t;
         srand((unsigned)time(&t));
+    } else
+    {
+        adjustProcessAndThreadPriority();
     }
-
-    adjustProcessAndThreadPriority();
 
     for (uint8_t i = 0; i < ZYDIS_ARRAY_SIZE(tests); ++i)
     {
         FILE* file;
 
-        size_t len = strlen(directory);
+        const size_t len = strlen(directory);
         char buf[1024];
         strncpy(&buf[0], directory, sizeof(buf) - 1);
         if (generate)
         {
-            file = fopen(strncat(buf, tests[i].filename, sizeof(buf) - len - 1), "wb");   
+            file = fopen(strncat(buf, tests[i].filename, sizeof(buf) - len - 1), "wb");
         } else
         {
             file = fopen(strncat(buf, tests[i].filename, sizeof(buf) - len - 1), "rb");
@@ -383,34 +400,35 @@ int main(int argc, char** argv)
         } else
         {
             fseek(file, 0L, SEEK_END);
-            long length = ftell(file);
+            const long length = ftell(file);
             void* buffer = malloc(length);
             if (!buffer)
             {
-                fprintf(stderr, 
-                    "Failed to allocate %" PRIu64 " bytes on the heap", (uint64_t)length); 
+                fprintf(stderr,
+                    "Failed to allocate %" PRIu64 " bytes on the heap", (uint64_t)length);
                 goto NextFile2;
             }
 
             rewind(file);
-            if (fread(buffer, 1, length, file) != length)
+            if (fread(buffer, 1, length, file) != (size_t)length)
             {
-                fprintf(stderr, 
-                    "Could not read %" PRIu64 " bytes from file \"%s\"", (uint64_t)length, &buf[0]);  
+                fprintf(stderr,
+                    "Could not read %" PRIu64 " bytes from file \"%s\"", (uint64_t)length, &buf[0]);
                 goto NextFile1;
             }
 
             printf("Testing %s ...\n", tests[i].encoding);
-            testPerformance(buffer, length, ZYDIS_DECODE_GRANULARITY_MINIMAL, ZYDIS_FALSE);
-            testPerformance(buffer, length, ZYDIS_DECODE_GRANULARITY_FULL   , ZYDIS_FALSE);
-            testPerformance(buffer, length, ZYDIS_DECODE_GRANULARITY_FULL   , ZYDIS_TRUE );
+            testPerformance(buffer, length, ZYDIS_TRUE , ZYDIS_FALSE);
+            testPerformance(buffer, length, ZYDIS_FALSE, ZYDIS_FALSE);
+            testPerformance(buffer, length, ZYDIS_FALSE, ZYDIS_TRUE );
             puts("");
 
-NextFile1:            
+        NextFile1:
             free(buffer);
-NextFile2:
-            fclose(file);
         }
+
+    NextFile2:
+        fclose(file);
     }
 
     return 0;

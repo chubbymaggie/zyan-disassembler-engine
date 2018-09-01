@@ -46,6 +46,46 @@ extern "C" {
 /* Decoded operand                                                                                */
 /* ============================================================================================== */
 
+/* ---------------------------------------------------------------------------------------------- */
+/* Memory type                                                                                    */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * @brief   Defines the @c ZydisMemoryOperandType datatype.
+ */
+typedef ZydisU8 ZydisMemoryOperandType;
+
+/**
+ * @brief   Values that represent memory-operand types.
+ */
+enum ZydisMemoryOperandTypes
+{
+    ZYDIS_MEMOP_TYPE_INVALID,
+    /**
+     * @brief   Normal memory operand.
+     */
+    ZYDIS_MEMOP_TYPE_MEM,
+    /**
+     * @brief   The memory operand is only used for address-generation. No real memory-access is
+     *          caused.
+     */
+    ZYDIS_MEMOP_TYPE_AGEN,
+    /**
+     * @brief   A memory operand using `SIB` addressing form, where the index register is not used
+     *          in address calculation and scale is ignored. No real memory-access is caused.
+     */
+    ZYDIS_MEMOP_TYPE_MIB,
+
+    /**
+     * @brief   Maximum value of this enum.
+     */
+    ZYDIS_MEMOP_TYPE_MAX_VALUE = ZYDIS_MEMOP_TYPE_MIB
+};
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Decoded operand                                                                                */
+/* ---------------------------------------------------------------------------------------------- */
+
 /**
  * @brief   Defines the @c ZydisDecodedOperand struct.
  */
@@ -54,7 +94,7 @@ typedef struct ZydisDecodedOperand_
     /**
      * @brief   The operand-id.
      */
-    uint8_t id;
+    ZydisU8 id;
     /**
      * @brief   The type of the operand.
      */
@@ -66,7 +106,7 @@ typedef struct ZydisDecodedOperand_
     /**
      * @brief   The operand-action.
      */
-    ZydisOperandAction action; 
+    ZydisOperandAction action;
     /**
      * @brief   The operand-encoding.
      */
@@ -74,7 +114,7 @@ typedef struct ZydisDecodedOperand_
     /**
      * @brief   The logical size of the operand (in bits).
      */
-    uint16_t size; 
+    ZydisU16 size;
     /**
      * @brief   The element-type.
      */
@@ -86,7 +126,7 @@ typedef struct ZydisDecodedOperand_
     /**
      * @brief   The number of elements.
      */
-    uint16_t elementCount;
+    ZydisU16 elementCount;
     /**
      * @brief   Extended info for register-operands.
      */
@@ -95,7 +135,7 @@ typedef struct ZydisDecodedOperand_
         /**
          * @brief   The register value.
          */
-        ZydisRegister value; 
+        ZydisRegister value;
         // TODO: AVX512_4VNNIW MULTISOURCE registers
     } reg;
     /**
@@ -104,9 +144,9 @@ typedef struct ZydisDecodedOperand_
     struct
     {
         /**
-         * @brief   Signals, if the memory operand is only used for address generation.
+         * @brief   The type of the memory operand.
          */
-        ZydisBool isAddressGenOnly;
+        ZydisMemoryOperandType type;
         /**
          * @brief   The segment register.
          */
@@ -122,7 +162,7 @@ typedef struct ZydisDecodedOperand_
         /**
          * @brief   The scale factor.
          */
-        uint8_t scale;
+        ZydisU8 scale;
         /**
          * @brief   Extended info for memory-operands with displacement.
          */
@@ -135,16 +175,16 @@ typedef struct ZydisDecodedOperand_
             /**
              * @brief   The displacement value
              */
-            int64_t value;
+            ZydisI64 value;
         } disp;
     } mem;
     /**
      * @brief   Extended info for pointer-operands.
      */
-    struct 
+    struct
     {
-        uint16_t segment;
-        uint32_t offset;
+        ZydisU16 segment;
+        ZydisU32 offset;
     } ptr;
     /**
      * @brief   Extended info for immediate-operands.
@@ -156,20 +196,22 @@ typedef struct ZydisDecodedOperand_
          */
         ZydisBool isSigned;
         /**
-         * @brief   Signals, if the immediate value contains a relative offset. You can use 
+         * @brief   Signals, if the immediate value contains a relative offset. You can use
          *          @c ZydisCalcAbsoluteAddress to determine the absolute address value.
          */
         ZydisBool isRelative;
         /**
          * @brief   The immediate value.
          */
-        union 
+        union
         {
-            uint64_t u;
-            int64_t s;         
+            ZydisU64 u;
+            ZydisI64 s;
         } value;
     } imm;
 } ZydisDecodedOperand;
+
+/* ---------------------------------------------------------------------------------------------- */
 
 /* ============================================================================================== */
 /* Decoded instruction                                                                            */
@@ -182,7 +224,7 @@ typedef struct ZydisDecodedOperand_
 /**
  * @brief   Defines the @c ZydisInstructionAttributes datatype.
  */
-typedef uint64_t ZydisInstructionAttributes;
+typedef ZydisU64 ZydisInstructionAttributes;
 
 /**
  * @brief   The instruction has the ModRM byte.
@@ -229,39 +271,39 @@ typedef uint64_t ZydisInstructionAttributes;
 #define ZYDIS_ATTRIB_IS_FAR_BRANCH              0x0000001000000000 // (1 << 36) // TODO: rebase
 
 /**
- * @brief   The instruction accepts the lock prefix (0xF0). 
+ * @brief   The instruction accepts the lock prefix (0xF0).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_LOCK               0x0000000000000200 // (1 <<  9)
 /**
- * @brief   The instruction accepts the rep prefix (0xF3). 
+ * @brief   The instruction accepts the rep prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_REP                0x0000000000000400 // (1 << 10)
 /**
- * @brief   The instruction accepts the repe/repz prefix (0xF3). 
+ * @brief   The instruction accepts the repe/repz prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_REPE               0x0000000000000800 // (1 << 11)
 /**
- * @brief   The instruction accepts the repe/repz prefix (0xF3). 
+ * @brief   The instruction accepts the repe/repz prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_REPZ               0x0000000000000800 // (1 << 11)
 /**
- * @brief   The instruction accepts the repne/repnz prefix (0xF2). 
+ * @brief   The instruction accepts the repne/repnz prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_REPNE              0x0000000000001000 // (1 << 12)
 /**
- * @brief   The instruction accepts the repne/repnz prefix (0xF2). 
+ * @brief   The instruction accepts the repne/repnz prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_REPNZ              0x0000000000001000 // (1 << 12)
 /**
- * @brief   The instruction accepts the bound prefix (0xF2). 
+ * @brief   The instruction accepts the bound prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_BOUND              0x0000000000002000 // (1 << 13)
 /**
- * @brief   The instruction accepts the xacquire prefix (0xF2). 
+ * @brief   The instruction accepts the xacquire prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_XACQUIRE           0x0000000000004000 // (1 << 14)
 /**
- * @brief   The instruction accepts the xrelease prefix (0xF3). 
+ * @brief   The instruction accepts the xrelease prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_ACCEPTS_XRELEASE           0x0000000000008000 // (1 << 15)
 /**
@@ -278,47 +320,47 @@ typedef uint64_t ZydisInstructionAttributes;
  */
 #define ZYDIS_ATTRIB_ACCEPTS_SEGMENT            0x0000000000040000 // (1 << 18)
 /**
- * @brief   The instruction has the lock prefix (0xF0). 
+ * @brief   The instruction has the lock prefix (0xF0).
  */
 #define ZYDIS_ATTRIB_HAS_LOCK                   0x0000000000080000 // (1 << 19)
 /**
- * @brief   The instruction has the rep prefix (0xF3). 
+ * @brief   The instruction has the rep prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_HAS_REP                    0x0000000000100000 // (1 << 20)
 /**
- * @brief   The instruction has the repe/repz prefix (0xF3). 
+ * @brief   The instruction has the repe/repz prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_HAS_REPE                   0x0000000000200000 // (1 << 21)
 /**
- * @brief   The instruction has the repe/repz prefix (0xF3). 
+ * @brief   The instruction has the repe/repz prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_HAS_REPZ                   0x0000000000200000 // (1 << 21)
 /**
- * @brief   The instruction has the repne/repnz prefix (0xF2). 
+ * @brief   The instruction has the repne/repnz prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_HAS_REPNE                  0x0000000000400000 // (1 << 22)
 /**
- * @brief   The instruction has the repne/repnz prefix (0xF2). 
+ * @brief   The instruction has the repne/repnz prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_HAS_REPNZ                  0x0000000000400000 // (1 << 22)
 /**
- * @brief   The instruction has the bound prefix (0xF2). 
+ * @brief   The instruction has the bound prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_HAS_BOUND                  0x0000000000800000 // (1 << 23)
 /**
- * @brief   The instruction has the xacquire prefix (0xF2). 
+ * @brief   The instruction has the xacquire prefix (0xF2).
  */
 #define ZYDIS_ATTRIB_HAS_XACQUIRE               0x0000000001000000 // (1 << 24)
 /**
- * @brief   The instruction has the xrelease prefix (0xF3). 
+ * @brief   The instruction has the xrelease prefix (0xF3).
  */
 #define ZYDIS_ATTRIB_HAS_XRELEASE               0x0000000002000000 // (1 << 25)
 /**
- * @brief   The instruction has the branch-not-taken hint (0x2E). 
+ * @brief   The instruction has the branch-not-taken hint (0x2E).
  */
 #define ZYDIS_ATTRIB_HAS_BRANCH_NOT_TAKEN       0x0000000004000000 // (1 << 26)
 /**
- * @brief   The instruction has the branch-taken hint (0x3E). 
+ * @brief   The instruction has the branch-taken hint (0x3E).
  */
 #define ZYDIS_ATTRIB_HAS_BRANCH_TAKEN           0x0000000008000000 // (1 << 27)
 /**
@@ -326,35 +368,35 @@ typedef uint64_t ZydisInstructionAttributes;
  */
 #define ZYDIS_ATTRIB_HAS_SEGMENT                0x00000003F0000000
 /**
- * @brief   The instruction has the CS segment modifier (0x2E). 
+ * @brief   The instruction has the CS segment modifier (0x2E).
  */
 #define ZYDIS_ATTRIB_HAS_SEGMENT_CS             0x0000000010000000 // (1 << 28)
 /**
- * @brief   The instruction has the SS segment modifier (0x36). 
+ * @brief   The instruction has the SS segment modifier (0x36).
  */
 #define ZYDIS_ATTRIB_HAS_SEGMENT_SS             0x0000000020000000 // (1 << 29)
 /**
- * @brief   The instruction has the DS segment modifier (0x3E). 
+ * @brief   The instruction has the DS segment modifier (0x3E).
  */
 #define ZYDIS_ATTRIB_HAS_SEGMENT_DS             0x0000000040000000 // (1 << 30)
 /**
- * @brief   The instruction has the ES segment modifier (0x26). 
+ * @brief   The instruction has the ES segment modifier (0x26).
  */
 #define ZYDIS_ATTRIB_HAS_SEGMENT_ES             0x0000000080000000 // (1 << 31)
 /**
- * @brief   The instruction has the FS segment modifier (0x64). 
+ * @brief   The instruction has the FS segment modifier (0x64).
  */
 #define ZYDIS_ATTRIB_HAS_SEGMENT_FS             0x0000000100000000 // (1 << 32)
 /**
- * @brief   The instruction has the GS segment modifier (0x65). 
+ * @brief   The instruction has the GS segment modifier (0x65).
  */
 #define ZYDIS_ATTRIB_HAS_SEGMENT_GS             0x0000000200000000 // (1 << 33)
 /**
- * @brief   The instruction has the operand-size prefix (0x66). 
+ * @brief   The instruction has the operand-size prefix (0x66).
  */
 #define ZYDIS_ATTRIB_HAS_OPERANDSIZE            0x0000000400000000 // (1 << 34) // TODO: rename
 /**
- * @brief   The instruction has the address-size prefix (0x67). 
+ * @brief   The instruction has the address-size prefix (0x67).
  */
 #define ZYDIS_ATTRIB_HAS_ADDRESSSIZE            0x0000000800000000 // (1 << 35) // TODO: rename
 
@@ -365,12 +407,12 @@ typedef uint64_t ZydisInstructionAttributes;
 /**
  * @brief   Defines the @c ZydisCPUFlag datatype.
  */
-typedef uint8_t ZydisCPUFlag;
+typedef ZydisU8 ZydisCPUFlag;
 
 /**
  * @brief   Defines the @c ZydisCPUFlagMask datatype.
  */
-typedef uint32_t ZydisCPUFlagMask;
+typedef ZydisU32 ZydisCPUFlagMask;
 
 /**
  * @brief   Values that represent CPU-flags.
@@ -461,6 +503,7 @@ enum ZydisCPUFlags
      * @brief   FPU condition-code flag 3.
      */
     ZYDIS_CPUFLAG_C3,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -470,19 +513,42 @@ enum ZydisCPUFlags
 /**
  * @brief   Defines the @c ZydisCPUFlagAction datatype.
  */
-typedef uint8_t ZydisCPUFlagAction;
+typedef ZydisU8 ZydisCPUFlagAction;
 
 /**
  * @brief   Values that represent CPU-flag actions.
  */
 enum ZydisCPUFlagActions
 {
+    /**
+     * @brief   The CPU flag is not touched by the instruction.
+     */
     ZYDIS_CPUFLAG_ACTION_NONE,
+    /**
+     * @brief   The CPU flag is tested (read).
+     */
     ZYDIS_CPUFLAG_ACTION_TESTED,
+    /**
+     * @brief   The CPU flag is tested and modified aferwards (read-write).
+     */
+    ZYDIS_CPUFLAG_ACTION_TESTED_MODIFIED,
+    /**
+     * @brief   The CPU flag is modified (write).
+     */
     ZYDIS_CPUFLAG_ACTION_MODIFIED,
+    /**
+     * @brief   The CPU flag is set to 0 (write).
+     */
     ZYDIS_CPUFLAG_ACTION_SET_0,
+    /**
+     * @brief   The CPU flag is set to 1 (write).
+     */
     ZYDIS_CPUFLAG_ACTION_SET_1,
+    /**
+     * @brief   The CPU flag is undefined (write).
+     */
     ZYDIS_CPUFLAG_ACTION_UNDEFINED,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -496,7 +562,7 @@ enum ZydisCPUFlagActions
 /**
  * @brief   Defines the @c ZydisExceptionClass datatype.
  */
-typedef uint8_t ZydisExceptionClass;
+typedef ZydisU8 ZydisExceptionClass;
 
 /**
  * @brief   Values that represent exception-classes.
@@ -544,6 +610,7 @@ enum ZydisExceptionClasses
     ZYDIS_EXCEPTION_CLASS_E12NP,
     ZYDIS_EXCEPTION_CLASS_K20,
     ZYDIS_EXCEPTION_CLASS_K21,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -557,7 +624,7 @@ enum ZydisExceptionClasses
 /**
  * @brief   Defines the @c ZydisVectorLength datatype.
  */
-typedef uint16_t ZydisVectorLength;
+typedef ZydisU16 ZydisVectorLength;
 
 /**
  * @brief   Values that represent vector-lengths.
@@ -568,6 +635,7 @@ enum ZydisVectorLengths
     ZYDIS_VECTOR_LENGTH_128     = 128,
     ZYDIS_VECTOR_LENGTH_256     = 256,
     ZYDIS_VECTOR_LENGTH_512     = 512,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -581,7 +649,7 @@ enum ZydisVectorLengths
 /**
  * @brief   Defines the @c ZydisMaskMode datatype.
  */
-typedef uint8_t ZydisMaskMode;
+typedef ZydisU8 ZydisMaskMode;
 
 /**
  * @brief   Values that represent AVX mask-modes.
@@ -589,8 +657,13 @@ typedef uint8_t ZydisMaskMode;
 enum ZydisMaskModes
 {
     ZYDIS_MASK_MODE_INVALID,
+
+    // TODO: Add `ZYDIS_MASK_MODE_DISABLED` for for `EVEX`/`MVEX` instructions with `K0` mask
+    // TODO: Add `ZYDIS_MASK_MODE_CONTROL` and `ZYDIS_MASK_MODE_CONTROL_ZERO` as replacement for
+    //       the `isControlMask` field
+
     /**
-     * @brief   The embedded mask register is used as a merge-mask. This is the default mode for 
+     * @brief   The embedded mask register is used as a merge-mask. This is the default mode for
      *          all EVEX/MVEX-instructions.
      */
     ZYDIS_MASK_MODE_MERGE,
@@ -598,6 +671,7 @@ enum ZydisMaskModes
      * @brief   The embedded mask register is used as a zero-mask.
      */
     ZYDIS_MASK_MODE_ZERO,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -611,7 +685,7 @@ enum ZydisMaskModes
 /**
  * @brief   Defines the @c ZydisBroadcastMode datatype.
  */
-typedef uint8_t ZydisBroadcastMode;
+typedef ZydisU8 ZydisBroadcastMode;
 
 /**
  * @brief   Values that represent AVX broadcast-modes.
@@ -631,6 +705,7 @@ enum ZydisBroadcastModes
     ZYDIS_BROADCAST_MODE_4_TO_8,
     ZYDIS_BROADCAST_MODE_4_TO_16,
     ZYDIS_BROADCAST_MODE_8_TO_16,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -644,7 +719,7 @@ enum ZydisBroadcastModes
 /**
  * @brief   Defines the @c ZydisRoundingMode datatype.
  */
-typedef uint8_t ZydisRoundingMode;
+typedef ZydisU8 ZydisRoundingMode;
 
 /**
  * @brief   Values that represent AVX rounding-modes.
@@ -668,6 +743,7 @@ enum ZydisRoundingModes
      * @brief   Round towards zero.
      */
     ZYDIS_ROUNDING_MODE_RZ,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -681,7 +757,7 @@ enum ZydisRoundingModes
 /**
  * @brief   Defines the @c ZydisSwizzleMode datatype.
  */
-typedef uint8_t ZydisSwizzleMode;
+typedef ZydisU8 ZydisSwizzleMode;
 
 /**
  * @brief   Values that represent swizzle-modes.
@@ -697,6 +773,7 @@ enum ZydisSwizzleModes
     ZYDIS_SWIZZLE_MODE_BBBB,
     ZYDIS_SWIZZLE_MODE_CCCC,
     ZYDIS_SWIZZLE_MODE_DDDD,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -710,7 +787,7 @@ enum ZydisSwizzleModes
 /**
  * @brief   Defines the @c ZydisConversionMode datatype.
  */
-typedef uint8_t ZydisConversionMode;
+typedef ZydisU8 ZydisConversionMode;
 
 /**
  * @brief   Values that represent conversion-modes.
@@ -723,6 +800,7 @@ enum ZydisConversionModes
     ZYDIS_CONVERSION_MODE_UINT8,
     ZYDIS_CONVERSION_MODE_SINT16,
     ZYDIS_CONVERSION_MODE_UINT16,
+
     /**
      * @brief   Maximum value of this enum.
      */
@@ -745,15 +823,15 @@ typedef struct ZydisDecodedInstruction_
     /**
      * @brief   The instruction-mnemonic.
      */
-    ZydisMnemonic mnemonic;  
+    ZydisMnemonic mnemonic;
     /**
      * @brief   The length of the decoded instruction.
      */
-    uint8_t length;
+    ZydisU8 length;
     /**
      * @brief   The raw bytes of the decoded instruction.
      */
-    uint8_t data[ZYDIS_MAX_INSTRUCTION_LENGTH];
+    ZydisU8 data[ZYDIS_MAX_INSTRUCTION_LENGTH];
     /**
      * @brief   The instruction-encoding (default, 3DNow, VEX, EVEX, XOP).
      */
@@ -765,23 +843,23 @@ typedef struct ZydisDecodedInstruction_
     /**
      * @brief   The instruction-opcode.
      */
-    uint8_t opcode;
+    ZydisU8 opcode;
     /**
      * @brief   The stack width.
      */
-    uint8_t stackWidth;
+    ZydisU8 stackWidth;
     /**
      * @brief   The effective operand width.
      */
-    uint8_t operandWidth;
+    ZydisU8 operandWidth;
     /**
      * @brief   The effective address width.
      */
-    uint8_t addressWidth;
+    ZydisU8 addressWidth;
     /**
      * @brief   The number of instruction-operands.
      */
-    uint8_t operandCount;
+    ZydisU8 operandCount;
     /**
      * @brief   Detailed info for all instruction operands.
      */
@@ -791,17 +869,10 @@ typedef struct ZydisDecodedInstruction_
      */
     ZydisInstructionAttributes attributes;
     /**
-     * @brief   The instruction address points at the current instruction (relative to the 
-     *          initial instruction pointer).
+     * @brief   The instruction address points at the current instruction (based on the initial
+     *          instruction pointer).
      */
-    uint64_t instrAddress;
-    /**
-     * @brief   The instruction pointer points at the address of the next instruction (relative
-     *          to the initial instruction pointer). 
-     *          
-     * This field is used to properly format relative instructions.
-     */
-    uint64_t instrPointer;
+    ZydisU64 instrAddress;
     /**
      * @brief   Information about accessed CPU flags.
      */
@@ -809,8 +880,8 @@ typedef struct ZydisDecodedInstruction_
     {
         /**
          * @brief   The CPU-flag action.
-         * 
-         * You can call `ZydisGetAccessedFlagsByAction` to get a mask with all flags matching a 
+         *
+         * You can call `ZydisGetAccessedFlagsByAction` to get a mask with all flags matching a
          * specific action.
          */
         ZydisCPUFlagAction action;
@@ -825,7 +896,7 @@ typedef struct ZydisDecodedInstruction_
          */
         ZydisVectorLength vectorLength;
         /**
-         * @brief   Info about the embedded writemask-register.
+         * @brief   Info about the embedded writemask-register (`AVX-512` and `KNC` only).
          */
         struct
         {
@@ -838,7 +909,7 @@ typedef struct ZydisDecodedInstruction_
              */
             ZydisRegister reg;
             /**
-             * @brief   Signals, if the mask-register is used as a control mask. 
+             * @brief   Signals, if the mask-register is used as a control mask.
              */
             ZydisBool isControlMask;
         } mask;
@@ -849,9 +920,9 @@ typedef struct ZydisDecodedInstruction_
         {
             /**
              * @brief   Signals, if the broadcast is a static broadcast.
-             * 
+             *
              * This is the case for instructions with inbuild broadcast functionality, that is
-             * always active and not be controlled by a flag in the XOP/VEX/EVEX/MVEX-prefix.
+             * always active controlled by the `EVEX/MVEX.RC` bits.
              */
             ZydisBool isStatic;
             /**
@@ -867,36 +938,37 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   The AVX rounding-mode.
              */
-            ZydisRoundingMode mode;    
+            ZydisRoundingMode mode;
         } rounding;
         /**
-         * @brief   Contains info about the AVX register-swizzle (MVEX only).
+         * @brief   Contains info about the AVX register-swizzle (`KNC` only).
          */
         struct
         {
             /**
-             * @brief   The AVX register-swizzle mode (MVEX only).
+             * @brief   The AVX register-swizzle mode.
              */
-            ZydisSwizzleMode mode;   
+            ZydisSwizzleMode mode;
         } swizzle;
         /**
-         * @brief   Contains info about the AVX data-conversion (MVEX only).
+         * @brief   Contains info about the AVX data-conversion (`KNC` only).
          */
         struct
         {
             /**
-             * @brief   The AVX data-conversion mode (MVEX only).
+             * @brief   The AVX data-conversion mode.
              */
-            ZydisConversionMode mode;  
+            ZydisConversionMode mode;
         } conversion;
         /**
          * @brief   Signals, if the sae functionality is enabled for the instruction.
          */
         ZydisBool hasSAE;
         /**
-         * @brief   Signals, if the instruction has a memory eviction-hint (MVEX only).
+         * @brief   Signals, if the instruction has a memory eviction-hint (`KNC` only).
          */
         ZydisBool hasEvictionHint;
+        // TODO: publish EVEX tuple-type and MVEX functionality
     } avx;
     /**
      * @brief   Meta info.
@@ -921,7 +993,7 @@ typedef struct ZydisDecodedInstruction_
         ZydisExceptionClass exceptionClass;
     } meta;
     /**
-     * @brief   Extended info about different instruction-parts like ModRM, SIB or 
+     * @brief   Extended info about different instruction-parts like ModRM, SIB or
      *          encoding-prefixes.
      */
     struct
@@ -931,19 +1003,19 @@ typedef struct ZydisDecodedInstruction_
          */
         struct
         {
-            uint8_t data[ZYDIS_MAX_INSTRUCTION_LENGTH - 1];
-            uint8_t count;
-            uint8_t hasF0;
-            uint8_t hasF3;
-            uint8_t hasF2;
-            uint8_t has2E;
-            uint8_t has36;
-            uint8_t has3E;
-            uint8_t has26;
-            uint8_t has64;
-            uint8_t has65;
-            uint8_t has66;
-            uint8_t has67;
+            ZydisU8 data[ZYDIS_MAX_INSTRUCTION_LENGTH - 1];
+            ZydisU8 count;
+            ZydisU8 hasF0;
+            ZydisU8 hasF3;
+            ZydisU8 hasF2;
+            ZydisU8 has2E;
+            ZydisU8 has36;
+            ZydisU8 has3E;
+            ZydisU8 has26;
+            ZydisU8 has64;
+            ZydisU8 has65;
+            ZydisU8 has66;
+            ZydisU8 has67;
         } prefixes;
         /**
          * @brief   Detailed info about the REX-prefix.
@@ -957,24 +1029,24 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   The raw bytes of the prefix.
              */
-            uint8_t data[1];
+            ZydisU8 data[1];
             /**
              * @brief   64-bit operand-size promotion.
              */
-            uint8_t W;
+            ZydisU8 W;
             /**
              * @brief   Extension of the ModRM.reg field.
              */
-            uint8_t R;
+            ZydisU8 R;
             /**
              * @brief   Extension of the SIB.index field.
              */
-            uint8_t X;
+            ZydisU8 X;
             /**
              * @brief   Extension of the ModRM.rm, SIB.base, or opcode.reg field.
              */
-            uint8_t B;
-        } rex; 
+            ZydisU8 B;
+        } rex;
         /**
          * @brief   Detailed info about the XOP-prefix.
          */
@@ -987,39 +1059,39 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   The raw bytes of the prefix.
              */
-            uint8_t data[3];
+            ZydisU8 data[3];
             /**
              * @brief   Extension of the ModRM.reg field (inverted).
              */
-            uint8_t R;
+            ZydisU8 R;
             /**
              * @brief   Extension of the SIB.index field (inverted).
              */
-            uint8_t X;
+            ZydisU8 X;
             /**
              * @brief   Extension of the ModRM.rm, SIB.base, or opcode.reg field (inverted).
              */
-            uint8_t B;
+            ZydisU8 B;
             /**
              * @brief   Opcode-map specifier.
              */
-            uint8_t m_mmmm;
+            ZydisU8 m_mmmm;
             /**
              * @brief   64-bit operand-size promotion or opcode-extension.
              */
-            uint8_t W;
+            ZydisU8 W;
             /**
              * @brief   NDS register specifier (inverted).
              */
-            uint8_t vvvv;
+            ZydisU8 vvvv;
             /**
              * @brief   Vector-length specifier.
              */
-            uint8_t L;
+            ZydisU8 L;
             /**
              * @brief   Compressed legacy prefix.
              */
-            uint8_t pp;
+            ZydisU8 pp;
         } xop;
         /**
          * @brief   Detailed info about the VEX-prefix.
@@ -1033,39 +1105,39 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   The raw bytes of the prefix.
              */
-            uint8_t data[3];
+            ZydisU8 data[3];
             /**
              * @brief   Extension of the ModRM.reg field (inverted).
              */
-            uint8_t R;
+            ZydisU8 R;
             /**
              * @brief   Extension of the SIB.index field (inverted).
              */
-            uint8_t X;
+            ZydisU8 X;
             /**
              * @brief   Extension of the ModRM.rm, SIB.base, or opcode.reg field (inverted).
              */
-            uint8_t B;
+            ZydisU8 B;
             /**
              * @brief   Opcode-map specifier.
              */
-            uint8_t m_mmmm;
+            ZydisU8 m_mmmm;
             /**
              * @brief   64-bit operand-size promotion or opcode-extension.
              */
-            uint8_t W;
+            ZydisU8 W;
             /**
              * @brief   NDS register specifier (inverted).
              */
-            uint8_t vvvv;
+            ZydisU8 vvvv;
             /**
              * @brief   Vector-length specifier.
              */
-            uint8_t L;
+            ZydisU8 L;
             /**
              * @brief   Compressed legacy prefix.
              */
-            uint8_t pp;
+            ZydisU8 pp;
         } vex;
         /**
          * @brief   Detailed info about the EVEX-prefix.
@@ -1079,63 +1151,63 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   The raw bytes of the prefix.
              */
-            uint8_t data[4];
+            ZydisU8 data[4];
             /**
              * @brief   Extension of the ModRM.reg field (inverted).
              */
-            uint8_t R;
+            ZydisU8 R;
             /**
              * @brief   Extension of the SIB.index/vidx field (inverted).
              */
-            uint8_t X;
+            ZydisU8 X;
             /**
              * @brief   Extension of the ModRM.rm or SIB.base field (inverted).
              */
-            uint8_t B;
+            ZydisU8 B;
             /**
              * @brief   High-16 register specifier modifier (inverted).
              */
-            uint8_t R2;
+            ZydisU8 R2;
             /**
              * @brief   Opcode-map specifier.
              */
-            uint8_t mm;
+            ZydisU8 mm;
             /**
              * @brief   64-bit operand-size promotion or opcode-extension.
              */
-            uint8_t W;
+            ZydisU8 W;
             /**
              * @brief   NDS register specifier (inverted).
              */
-            uint8_t vvvv;
+            ZydisU8 vvvv;
             /**
              * @brief   Compressed legacy prefix.
              */
-            uint8_t pp;
+            ZydisU8 pp;
             /**
              * @brief   Zeroing/Merging.
              */
-            uint8_t z;
+            ZydisU8 z;
             /**
              * @brief   Vector-length specifier or rounding-control (most significant bit).
              */
-            uint8_t L2;
+            ZydisU8 L2;
             /**
              * @brief   Vector-length specifier or rounding-control (least significant bit).
              */
-            uint8_t L;
+            ZydisU8 L;
             /**
              * @brief   Broadcast/RC/SAE Context.
              */
-            uint8_t b;
+            ZydisU8 b;
             /**
              * @brief   High-16 NDS/VIDX register specifier.
              */
-            uint8_t V2;
+            ZydisU8 V2;
             /**
              * @brief   Embedded opmask register specifier.
              */
-            uint8_t aaa;
+            ZydisU8 aaa;
         } evex;
         /**
         * @brief    Detailed info about the MVEX-prefix.
@@ -1149,55 +1221,55 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   The raw bytes of the prefix.
              */
-            uint8_t data[4];
+            ZydisU8 data[4];
             /**
              * @brief   Extension of the ModRM.reg field (inverted).
              */
-            uint8_t R;
+            ZydisU8 R;
             /**
              * @brief   Extension of the SIB.index/vidx field (inverted).
              */
-            uint8_t X;
+            ZydisU8 X;
             /**
              * @brief   Extension of the ModRM.rm or SIB.base field (inverted).
              */
-            uint8_t B;
+            ZydisU8 B;
             /**
              * @brief   High-16 register specifier modifier (inverted).
              */
-            uint8_t R2;
+            ZydisU8 R2;
             /**
              * @brief   Opcode-map specifier.
              */
-            uint8_t mmmm;
+            ZydisU8 mmmm;
             /**
              * @brief   64-bit operand-size promotion or opcode-extension.
              */
-            uint8_t W;
+            ZydisU8 W;
             /**
              * @brief   NDS register specifier (inverted).
              */
-            uint8_t vvvv;
+            ZydisU8 vvvv;
             /**
              * @brief   Compressed legacy prefix.
              */
-            uint8_t pp;
+            ZydisU8 pp;
             /**
              * @brief   Non-temporal/eviction hint.
              */
-            uint8_t E;
+            ZydisU8 E;
             /**
              * @brief   Swizzle/broadcast/up-convert/down-convert/static-rounding controls.
              */
-            uint8_t SSS;
+            ZydisU8 SSS;
             /**
              * @brief   High-16 NDS/VIDX register specifier.
              */
-            uint8_t V2;
+            ZydisU8 V2;
             /**
              * @brief   Embedded opmask register specifier.
              */
-            uint8_t kkk;
+            ZydisU8 kkk;
         } mvex;
         /**
          * @brief   Detailed info about the ModRM-byte.
@@ -1205,10 +1277,10 @@ typedef struct ZydisDecodedInstruction_
         struct
         {
             ZydisBool isDecoded;
-            uint8_t data[1];
-            uint8_t mod;
-            uint8_t reg;
-            uint8_t rm;
+            ZydisU8 data[1];
+            ZydisU8 mod;
+            ZydisU8 reg;
+            ZydisU8 rm;
         } modrm;
         /**
          * @brief   Detailed info about the SIB-byte.
@@ -1216,10 +1288,10 @@ typedef struct ZydisDecodedInstruction_
         struct
         {
             ZydisBool isDecoded;
-            uint8_t data[1];
-            uint8_t scale;
-            uint8_t index;
-            uint8_t base;
+            ZydisU8 data[1];
+            ZydisU8 scale;
+            ZydisU8 index;
+            ZydisU8 base;
         } sib;
         /**
          * @brief   Detailed info about displacement-bytes.
@@ -1229,16 +1301,17 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   The displacement value
              */
-            int64_t value;
+            ZydisI64 value;
             /**
              * @brief   The physical displacement size, in bits.
              */
-            uint8_t size;
+            ZydisU8 size;
+            // TODO: publish cd8 scale
             /**
              * @brief   The offset of the displacement data, relative to the beginning of the
              *          instruction, in bytes.
              */
-            uint8_t offset;
+            ZydisU8 offset;
         } disp;
         /**
          * @brief   Detailed info about immediate-bytes.
@@ -1248,9 +1321,9 @@ typedef struct ZydisDecodedInstruction_
             /**
              * @brief   Signals, if the immediate value is signed.
              */
-            ZydisBool isSigned;  
+            ZydisBool isSigned;
             /**
-             * @brief   Signals, if the immediate value contains a relative offset. You can use 
+             * @brief   Signals, if the immediate value contains a relative offset. You can use
              *          @c ZydisCalcAbsoluteAddress to determine the absolute address value.
              */
             ZydisBool isRelative;
@@ -1258,19 +1331,19 @@ typedef struct ZydisDecodedInstruction_
              * @brief   The immediate value.
              */
             union
-            {  
-                uint64_t u;
-                int64_t s;
+            {
+                ZydisU64 u;
+                ZydisI64 s;
             } value;
             /**
              * @brief   The physical immediate size, in bits.
              */
-            uint8_t size;
+            ZydisU8 size;
             /**
              * @brief   The offset of the immediate data, relative to the beginning of the
              *          instruction, in bytes.
              */
-            uint8_t offset;
+            ZydisU8 offset;
         } imm[2];
     } raw;
 } ZydisDecodedInstruction;
