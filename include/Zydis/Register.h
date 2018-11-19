@@ -32,9 +32,10 @@
 #ifndef ZYDIS_REGISTER_H
 #define ZYDIS_REGISTER_H
 
-#include <Zydis/Defines.h>
-#include <Zydis/CommonTypes.h>
-#include <Zydis/String.h>
+#include <Zycore/Defines.h>
+#include <Zycore/Types.h>
+#include <Zydis/SharedTypes.h>
+#include <Zydis/ShortString.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,14 +56,9 @@ extern "C" {
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the @c ZydisRegisterClass datatype.
+ * @brief   Defines the `ZydisRegisterClass` enum.
  */
-typedef ZydisU8 ZydisRegisterClass;
-
-/**
- * @brief   Values that represent zydis register-classes.
- */
-enum ZydisRegisterClasses
+typedef enum ZydisRegisterClass
 {
     ZYDIS_REGCLASS_INVALID,
     /**
@@ -137,17 +133,21 @@ enum ZydisRegisterClasses
     /**
      * @brief   Maximum value of this enum.
      */
-    ZYDIS_REGCLASS_MAX_VALUE = ZYDIS_REGCLASS_BOUND
-};
+    ZYDIS_REGCLASS_MAX_VALUE = ZYDIS_REGCLASS_BOUND,
+    /**
+     * @brief   The minimum number of bits required to represent all values of this enum.
+     */
+    ZYDIS_REGCLASS_REQUIRED_BITS = ZYAN_BITS_TO_REPRESENT(ZYDIS_REGCLASS_MAX_VALUE)
+} ZydisRegisterClass;
 
 /* ---------------------------------------------------------------------------------------------- */
 /* Register width                                                                                 */
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the @c ZydisRegisterWidth datatype.
+ * @brief   Defines the `ZydisRegisterWidth` datatype.
  */
-typedef ZydisU16 ZydisRegisterWidth;
+typedef ZyanU16 ZydisRegisterWidth;
 
 /* ---------------------------------------------------------------------------------------------- */
 
@@ -156,15 +156,25 @@ typedef ZydisU16 ZydisRegisterWidth;
 /* ============================================================================================== */
 
 /**
- * @brief   Returns the register specified by the @c registerClass and the @c id.
+ * @addtogroup register Register
+ * @brief Functions allowing retrieval of information about registers.
+ * @{
+ */
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Register                                                                                       */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * @brief   Returns the register specified by the `register_class` and `id` tuple.
  *
- * @param   registerClass   The register class.
+ * @param   register_class  The register class.
  * @param   id              The register id.
  *
- * @return  The register specified by the @c registerClass and the @c id or @c ZYDIS_REGISTER_NONE,
+ * @return  The register specified by the `register_class` and `id` tuple or `ZYDIS_REGISTER_NONE`,
  *          if an invalid parameter was passed.
  */
-ZYDIS_EXPORT ZydisRegister ZydisRegisterEncode(ZydisRegisterClass registerClass, ZydisU8 id);
+ZYDIS_EXPORT ZydisRegister ZydisRegisterEncode(ZydisRegisterClass register_class, ZyanU8 id);
 
 /**
  * @brief   Returns the id of the specified register.
@@ -173,7 +183,7 @@ ZYDIS_EXPORT ZydisRegister ZydisRegisterEncode(ZydisRegisterClass registerClass,
  *
  * @return  The id of the specified register, or -1 if an invalid parameter was passed.
  */
-ZYDIS_EXPORT ZydisI16 ZydisRegisterGetId(ZydisRegister reg);
+ZYDIS_EXPORT ZyanI8 ZydisRegisterGetId(ZydisRegister reg);
 
 /**
  * @brief   Returns the register-class of the specified register.
@@ -187,40 +197,66 @@ ZYDIS_EXPORT ZydisRegisterClass ZydisRegisterGetClass(ZydisRegister reg);
 /**
  * @brief   Returns the width of the specified register.
  *
- * @param   reg The register.
+ * @param   mode    The active machine mode.
+ * @param   reg     The register.
  *
- * @return  The width of the specified register.
+ * @return  The width of the specified register, or `ZYDIS_REGISTER_NONE` if the register is
+ *          invalid for the active machine-mode.
  */
-ZYDIS_EXPORT ZydisRegisterWidth ZydisRegisterGetWidth(ZydisRegister reg);
+ZYDIS_EXPORT ZydisRegisterWidth ZydisRegisterGetWidth(ZydisMachineMode mode, ZydisRegister reg);
 
 /**
- * @brief   Returns the width of the specified register in 64-bit mode.
+ * @brief   Returns the largest enclosing register of the given register.
  *
- * @param   reg The register.
+ * @param   mode    The active machine mode.
+ * @param   reg     The register.
  *
- * @return  The width of the specified register.
+ * @return  The largest enclosing register of the given register, or `ZYDIS_REGISTER_NONE` if the
+ *          register is invalid for the active machine-mode or does not have an enclosing-register.
  */
-ZYDIS_EXPORT ZydisRegisterWidth ZydisRegisterGetWidth64(ZydisRegister reg);
+ZYDIS_EXPORT ZydisRegister ZydisRegisterGetLargestEnclosing(ZydisMachineMode mode,
+    ZydisRegister reg);
 
 /**
  * @brief   Returns the specified register string.
  *
  * @param   reg The register.
  *
- * @return  The register string or @c NULL, if an invalid register was passed.
+ * @return  The register string or `ZYAN_NULL`, if an invalid register was passed.
  */
 ZYDIS_EXPORT const char* ZydisRegisterGetString(ZydisRegister reg);
 
 /**
- * @brief   Returns the specified register string as `ZydisStaticString`.
+ * @brief   Returns the specified register string as `ZydisShortString`.
  *
  * @param   reg The register.
  *
- * @return  The register string or @c NULL, if an invalid register was passed.
+ * @return  The register string or `ZYAN_NULL`, if an invalid register was passed.
  *
  * The `buffer` of the returned struct is guaranteed to be zero-terminated in this special case.
  */
-ZYDIS_EXPORT const ZydisStaticString* ZydisRegisterGetStaticString(ZydisRegister reg);
+ZYDIS_EXPORT const ZydisShortString* ZydisRegisterGetStringWrapped(ZydisRegister reg);
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Register class                                                                                 */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * @brief   Returns the width of the specified register-class.
+ *
+ * @param   mode            The active machine mode.
+ * @param   register_class  The register class.
+ *
+ * @return  The width of the specified register.
+ */
+ZYDIS_EXPORT ZydisRegisterWidth ZydisRegisterClassGetWidth(ZydisMachineMode mode,
+    ZydisRegisterClass register_class);
+
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * @}
+ */
 
 /* ============================================================================================== */
 

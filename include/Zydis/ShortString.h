@@ -2,7 +2,7 @@
 
   Zyan Disassembler Library (Zydis)
 
-  Original Author : Joel Hoener
+  Original Author : Florian Bernd
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,59 +24,67 @@
 
 ***************************************************************************************************/
 
-#ifndef ZYDIS_INTERNAL_LIBC_H
-#define ZYDIS_INTERNAL_LIBC_H
-
-#include <Zydis/Defines.h>
-
-#ifndef ZYDIS_NO_LIBC
-
-/* ============================================================================================== */
-/* LibC is available                                                                              */
-/* ============================================================================================== */
-
-#   include <string.h>
-#   define ZydisMemoryCopy memcpy
-#   define ZydisMemorySet  memset
-#   define ZydisStrLen     strlen
-
-#else
-
-/* ============================================================================================== */
-/* No LibC available, use our own functions                                                       */
-/* ============================================================================================== */
-
-/*
- * These implementations are by no means optimized and will be outperformed by pretty much any
- * libc implementation out there. We do not aim towards providing competetive implementations here,
- * but towards providing a last resort fallback for environments without a working libc.
+/**
+ * @file
+ * @brief   Defines the immutable and storage-efficent `ZydisShortString` struct, which is used to
+ *          store strings in the generated tables.
  */
 
-ZYDIS_INLINE void* ZydisMemorySet(void* ptr, int value, ZydisUSize num)
-{
-    ZydisU8 c = value & 0xff;
-    for (ZydisUSize i = 0; i < num; ++i) ((ZydisU8*)ptr)[i] = c;
-    return ptr;
-}
+#ifndef ZYDIS_SHORTSTRING_H
+#define ZYDIS_SHORTSTRING_H
 
-ZYDIS_INLINE void* ZydisMemoryCopy(void* dst, const void* src, ZydisUSize num)
-{
-    for (ZydisUSize i = 0; i < num; ++i)
-    {
-        ((ZydisU8*)dst)[i] = ((const ZydisU8*)src)[i];
-    }
-    return dst;
-}
+#include <ZydisExportConfig.h>
+#include <Zycore/Defines.h>
+#include <Zycore/Types.h>
 
-ZYDIS_INLINE ZydisUSize ZydisStrLen(const char* str)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ============================================================================================== */
+/* Enums and types                                                                                */
+/* ============================================================================================== */
+
+#pragma pack(push, 1)
+
+/**
+ * @brief   Defines the `ZydisShortString` struct.
+ *
+ * This compact struct is mainly used for internal string-tables to save up some bytes.
+ *
+ * All fields in this struct should be considered as "private". Any changes may lead to unexpected
+ * behavior.
+ */
+typedef struct ZydisShortString_
 {
-    const char *s;
-    for (s = str; *s; ++s);
-    return s - str;
-}
+    /**
+     * @brief   The buffer that contains the actual (nullterminated) string.
+    */
+    const char* data;
+    /**
+     * @brief   The length (number of characters) of the string (without 0-termination).
+    */
+    ZyanU8 size;
+} ZydisShortString;
+
+#pragma pack(pop)
+
+/* ============================================================================================== */
+/* Macros                                                                                         */
+/* ============================================================================================== */
+
+/**
+ * @brief   Declares a `ZydisShortString` from a static C-style string.
+ *
+ * @param   string  The C-string constant.
+ */
+#define ZYDIS_MAKE_SHORTSTRING(string) \
+    { string, sizeof(string) - 1 }
 
 /* ============================================================================================== */
 
+#ifdef __cplusplus
+}
 #endif
 
-#endif /* ZYDIS_INTERNAL_LIBC_H */
+#endif /* ZYDIS_SHORTSTRING_H */

@@ -1,4 +1,4 @@
-static const char* zydisInstructionCategoryStrings[] =
+static const char* STR_INSTRUCTIONCATEGORY[] =
 {
     "INVALID",
     "ADOX_ADCX",
@@ -20,6 +20,7 @@ static const char* zydisInstructionCategoryStrings[] =
     "BROADCAST",
     "CALL",
     "CET",
+    "CLDEMOTE",
     "CLFLUSHOPT",
     "CLWB",
     "CLZERO",
@@ -49,8 +50,10 @@ static const char* zydisInstructionCategoryStrings[] =
     "LZCNT",
     "MISC",
     "MMX",
+    "MOVDIR",
     "MPX",
     "NOP",
+    "PADLOCK",
     "PCLMULQDQ",
     "PCONFIG",
     "PKU",
@@ -87,6 +90,7 @@ static const char* zydisInstructionCategoryStrings[] =
     "VFMA",
     "VPCLMULQDQ",
     "VTX",
+    "WAITPKG",
     "WIDENOP",
     "X87_ALU",
     "XOP",

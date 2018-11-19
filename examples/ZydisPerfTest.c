@@ -24,30 +24,68 @@
 
 ***************************************************************************************************/
 
+#include <inttypes.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <errno.h>
 #include <time.h>
+#include <Zycore/LibC.h>
+#include <Zycore/Terminal.h>
 #include <Zydis/Zydis.h>
-#include <inttypes.h>
 
-#if defined(ZYDIS_WINDOWS)
+#if defined(ZYAN_WINDOWS)
 #   include <Windows.h>
-#elif defined(ZYDIS_APPLE)
+#elif defined(ZYAN_APPLE)
 #   include <mach/mach_time.h>
-#elif defined(ZYDIS_LINUX)
+#elif defined(ZYAN_LINUX)
 #   include <sys/time.h>
 #   include <pthread.h>
-#elif defined(ZYDIS_FREEBSD)
-#   include <sys/time.h>
-#   include <pthread.h>
-#   include <pthread_np.h>
 #else
 #   error "Unsupported platform detected"
 #endif
+
+/* ============================================================================================== */
+/* Colors                                                                                         */
+/* ============================================================================================== */
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Configuration                                                                                  */
+/* ---------------------------------------------------------------------------------------------- */
+
+#define COLOR_DEFAULT       ZYAN_VT100SGR_FG_DEFAULT
+#define COLOR_ERROR         ZYAN_VT100SGR_FG_BRIGHT_RED
+#define COLOR_VALUE_R       ZYAN_VT100SGR_FG_BRIGHT_RED
+#define COLOR_VALUE_G       ZYAN_VT100SGR_FG_BRIGHT_GREEN
+#define COLOR_VALUE_B       ZYAN_VT100SGR_FG_CYAN
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Global variables                                                                               */
+/* ---------------------------------------------------------------------------------------------- */
+
+static ZyanBool g_vt100_stdout;
+static ZyanBool g_vt100_stderr;
+
+/* ---------------------------------------------------------------------------------------------- */
+/* Helper macros                                                                                  */
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * @brief   Conditionally expands to the passed VT100 sequence, if `g_colors_stdout` is
+ *          `ZYAN_TRUE`, or an empty string, if not.
+ *
+ * @param   The VT100 SGT sequence.
+ */
+#define CVT100_OUT(sequence) (g_vt100_stdout ? (sequence) : "")
+
+/**
+ * @brief   Conditionally expands to the passed VT100 sequence, if `g_colors_stderr` is
+ *          `ZYAN_TRUE`, or an empty string, if not.
+ *
+ * @param   The VT100 SGT sequence.
+ */
+#define CVT100_ERR(sequence) (g_vt100_stderr ? (sequence) : "")
+
+/* ---------------------------------------------------------------------------------------------- */
 
 /* ============================================================================================== */
 /* Helper functions                                                                               */
@@ -57,57 +95,64 @@
 /* Time measurement                                                                               */
 /* ---------------------------------------------------------------------------------------------- */
 
-#if defined(ZYDIS_WINDOWS)
-double   CounterFreq  = 0.0;
-uint64_t CounterStart = 0;
+#if defined(ZYAN_WINDOWS)
 
-void StartCounter()
+double  counter_freq  = 0.0;
+ZyanU64 counter_start = 0;
+
+static void StartCounter(void)
 {
     LARGE_INTEGER li;
     if (!QueryPerformanceFrequency(&li))
     {
-        fputs("Error: QueryPerformanceFrequency failed!\n", stderr);
+        ZYAN_FPRINTF(ZYAN_STDERR, "%sError: QueryPerformanceFrequency failed!%s\n",
+            CVT100_ERR(COLOR_ERROR), CVT100_ERR(ZYAN_VT100SGR_RESET));
+        exit(EXIT_FAILURE);
     }
-    CounterFreq = (double)li.QuadPart / 1000.0;
+    counter_freq = (double)li.QuadPart / 1000.0;
     QueryPerformanceCounter(&li);
-    CounterStart = li.QuadPart;
+    counter_start = li.QuadPart;
 }
 
-double GetCounter()
+static double GetCounter(void)
 {
     LARGE_INTEGER li;
     QueryPerformanceCounter(&li);
-    return (double)(li.QuadPart - CounterStart) / CounterFreq;
-}
-#elif defined(ZYDIS_APPLE)
-uint64_t counterStart = 0;
-mach_timebase_info_data_t timebaseInfo;
-
-void StartCounter()
-{
-    counterStart = mach_absolute_time();
+    return (double)(li.QuadPart - counter_start) / counter_freq;
 }
 
-double GetCounter()
-{
-    uint64_t elapsed = mach_absolute_time() - counterStart;
+#elif defined(ZYAN_APPLE)
 
-    if (timebaseInfo.denom == 0)
+ZyanU64 counter_start = 0;
+mach_timebase_info_data_t timebase_info;
+
+static void StartCounter(void)
+{
+    counter_start = mach_absolute_time();
+}
+
+static double GetCounter(void)
+{
+    ZyanU64 elapsed = mach_absolute_time() - counter_start;
+
+    if (timebase_info.denom == 0)
     {
-        mach_timebase_info(&timebaseInfo);
+        mach_timebase_info(&timebase_info);
     }
 
-    return (double)elapsed * timebaseInfo.numer / timebaseInfo.denom / 1000000;
+    return (double)elapsed * timebase_info.numer / timebase_info.denom / 1000000;
 }
-#elif defined(ZYDIS_LINUX) || defined(ZYDIS_FREEBSD)
+
+#elif defined(ZYAN_LINUX)
+
 struct timeval t1;
 
-void StartCounter()
+static void StartCounter(void)
 {
     gettimeofday(&t1, NULL);
 }
 
-double GetCounter()
+static double GetCounter(void)
 {
     struct timeval t2;
     gettimeofday(&t2, NULL);
@@ -115,45 +160,51 @@ double GetCounter()
     double t = (t2.tv_sec - t1.tv_sec) * 1000.0;
     return t + (t2.tv_usec - t1.tv_usec) / 1000.0;
 }
+
 #endif
 
 /* ---------------------------------------------------------------------------------------------- */
 /* Process & Thread Priority                                                                      */
 /* ---------------------------------------------------------------------------------------------- */
 
-void adjustProcessAndThreadPriority()
+static void AdjustProcessAndThreadPriority(void)
 {
-#ifdef ZYDIS_WINDOWS
+#ifdef ZYAN_WINDOWS
+
     SYSTEM_INFO info;
     GetSystemInfo(&info);
     if (info.dwNumberOfProcessors > 1)
     {
         if (!SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR)1))
         {
-            fputs("Warning: Could not set thread affinity mask\n", stderr);
+            ZYAN_FPRINTF(ZYAN_STDERR, "%sWarning: Could not set thread affinity mask%s\n",
+                CVT100_ERR(ZYAN_VT100SGR_FG_YELLOW), CVT100_ERR(ZYAN_VT100SGR_RESET));
         }
         if (!SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS))
         {
-            fputs("Warning: Could not set process priority class\n", stderr);
+            ZYAN_FPRINTF(ZYAN_STDERR, "%sWarning: Could not set process priority class%s\n",
+                CVT100_ERR(ZYAN_VT100SGR_FG_YELLOW), CVT100_ERR(ZYAN_VT100SGR_RESET));
         }
         if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL))
         {
-            fputs("Warning: Could not set thread priority class\n", stderr);
+            ZYAN_FPRINTF(ZYAN_STDERR, "%sWarning: Could not set thread priority class%s\n",
+                CVT100_ERR(ZYAN_VT100SGR_FG_YELLOW), CVT100_ERR(ZYAN_VT100SGR_RESET));
         }
     }
+
 #endif
-#if defined(ZYDIS_LINUX)
+#ifdef ZYAN_LINUX
+
     pthread_t thread = pthread_self();
     cpu_set_t cpus;
     CPU_ZERO(&cpus);
     CPU_SET(0, &cpus);
-    pthread_setaffinity_np(thread, sizeof(cpus), &cpus);
-#elif defined(ZYDIS_FREEBSD)
-    pthread_t thread = pthread_self();
-    cpuset_t cpus;
-    CPU_ZERO(&cpus);
-    CPU_SET(0, &cpus);
-    pthread_setaffinity_np(thread, sizeof(cpus), &cpus);
+    if (pthread_setaffinity_np(thread, sizeof(cpus), &cpus))
+    {
+        ZYAN_FPRINTF(ZYAN_STDERR, "%sWarning: Could not set thread affinity mask%s\n",
+            CVT100_ERR(ZYAN_VT100SGR_FG_YELLOW), CVT100_ERR(ZYAN_VT100SGR_RESET));
+    }
+
 #endif
 }
 
@@ -163,55 +214,72 @@ void adjustProcessAndThreadPriority()
 /* Internal functions                                                                             */
 /* ============================================================================================== */
 
-uint64_t processBuffer(const char* buffer, size_t length, ZydisBool minimalMode, ZydisBool format)
+static ZyanU64 ProcessBuffer(const char* buffer, ZyanUSize length, ZyanBool minimal_mode,
+    ZyanBool format, ZyanBool tokenize)
 {
     ZydisDecoder decoder;
-    if (!ZYDIS_SUCCESS(
-        ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64)))
+    if (!ZYAN_SUCCESS(ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64,
+        ZYDIS_ADDRESS_WIDTH_64)))
     {
-        fputs("Failed to initialize decoder\n", stderr);
+        ZYAN_FPRINTF(ZYAN_STDERR, "%sFailed to initialize decoder%s\n",
+            CVT100_ERR(COLOR_ERROR), CVT100_ERR(ZYAN_VT100SGR_RESET));
         exit(EXIT_FAILURE);
     }
-    if (!ZYDIS_SUCCESS(
-        ZydisDecoderEnableMode(&decoder, ZYDIS_DECODER_MODE_MINIMAL, minimalMode)))
+    if (!ZYAN_SUCCESS(ZydisDecoderEnableMode(&decoder, ZYDIS_DECODER_MODE_MINIMAL, minimal_mode)))
     {
-        fputs("Failed to adjust decoder-mode\n", stderr);
+        ZYAN_FPRINTF(ZYAN_STDERR, "%sFailed to adjust decoder-mode%s\n",
+            CVT100_ERR(COLOR_ERROR), CVT100_ERR(ZYAN_VT100SGR_RESET));
         exit(EXIT_FAILURE);
     }
 
     ZydisFormatter formatter;
     if (format)
     {
-        if (!ZYDIS_SUCCESS(ZydisFormatterInit(&formatter, ZYDIS_FORMATTER_STYLE_INTEL)) ||
-            !ZYDIS_SUCCESS(ZydisFormatterSetProperty(&formatter,
-                ZYDIS_FORMATTER_PROP_FORCE_MEMSEG, ZYDIS_TRUE)) ||
-            !ZYDIS_SUCCESS(ZydisFormatterSetProperty(&formatter,
-                ZYDIS_FORMATTER_PROP_FORCE_MEMSIZE, ZYDIS_TRUE)))
+        if (!ZYAN_SUCCESS(ZydisFormatterInit(&formatter, ZYDIS_FORMATTER_STYLE_INTEL)) ||
+            !ZYAN_SUCCESS(ZydisFormatterSetProperty(&formatter,
+                ZYDIS_FORMATTER_PROP_FORCE_SEGMENT, ZYAN_TRUE)) ||
+            !ZYAN_SUCCESS(ZydisFormatterSetProperty(&formatter,
+                ZYDIS_FORMATTER_PROP_FORCE_SIZE, ZYAN_TRUE)))
         {
-            fputs("Failed to initialize instruction-formatter\n", stderr);
+            ZYAN_FPRINTF(ZYAN_STDERR, "%sFailed to initialize instruction-formatter%s\n",
+                CVT100_ERR(COLOR_ERROR), CVT100_ERR(ZYAN_VT100SGR_RESET));
             exit(EXIT_FAILURE);
         }
     }
 
-    uint64_t count = 0;
-    size_t offset = 0;
-    ZydisStatus status;
+    ZyanU64 count = 0;
+    ZyanUSize offset = 0;
+    ZyanStatus status;
     ZydisDecodedInstruction instruction;
-    char formatBuffer[256];
-    while ((status = ZydisDecoderDecodeBuffer(&decoder, buffer + offset, length - offset, offset,
+    char format_buffer[256];
+    while ((status = ZydisDecoderDecodeBuffer(&decoder, buffer + offset, length - offset,
         &instruction)) != ZYDIS_STATUS_NO_MORE_DATA)
     {
-        ZYDIS_ASSERT(ZYDIS_SUCCESS(status));
-        if (!ZYDIS_SUCCESS(status))
+        if (!ZYAN_SUCCESS(status))
         {
-            fputs("Unexpected decoding error\n", stderr);
+            ZYAN_FPRINTF(ZYAN_STDERR, "%sUnexpected decoding error. Data: ",
+                CVT100_ERR(COLOR_ERROR));
+            for (ZyanUSize i = 0; i < ZYAN_MIN(ZYDIS_MAX_INSTRUCTION_LENGTH, length - offset); ++i)
+            {
+                 ZYAN_FPRINTF(ZYAN_STDERR, "%02X ", (ZyanU8)buffer[offset + i]);
+            }
+            ZYAN_FPRINTF(ZYAN_STDERR, "%s\n", CVT100_ERR(ZYAN_VT100SGR_RESET));
+            ZYAN_ASSERT(ZYAN_FALSE);
             exit(EXIT_FAILURE);
         }
         ++count;
         if (format)
         {
-            ZydisFormatterFormatInstruction(
-                &formatter, &instruction, formatBuffer, sizeof(formatBuffer));
+            if (tokenize)
+            {
+                const ZydisFormatterToken* token;
+                ZydisFormatterTokenizeInstruction(&formatter, &instruction, format_buffer,
+                    sizeof(format_buffer), offset, &token);
+            } else
+            {
+                ZydisFormatterFormatInstruction(&formatter, &instruction, format_buffer,
+                    sizeof(format_buffer), offset);
+            }
         }
         offset += instruction.length;
     }
@@ -219,43 +287,54 @@ uint64_t processBuffer(const char* buffer, size_t length, ZydisBool minimalMode,
     return count;
 }
 
-void testPerformance(const char* buffer, size_t length, ZydisBool minimalMode, ZydisBool format)
+static void TestPerformance(const char* buffer, ZyanUSize length, ZyanBool minimal_mode,
+    ZyanBool format, ZyanBool tokenize)
 {
     // Cache warmup
-    processBuffer(buffer, length, minimalMode, format);
+    ProcessBuffer(buffer, length, minimal_mode, format, tokenize);
 
     // Testing
-    uint64_t count = 0;
+    ZyanU64 count = 0;
     StartCounter();
-    for (uint8_t j = 0; j < 100; ++j)
+    for (ZyanU8 j = 0; j < 100; ++j)
     {
-        count += processBuffer(buffer, length, minimalMode, format);
+        count += ProcessBuffer(buffer, length, minimal_mode, format, tokenize);
     }
-    printf("Minimal-Mode %d, Formatting %d, Instructions: %6.2fM, Time: %8.2f msec\n",
-        minimalMode, format, (double)count / 1000000, GetCounter());
+    const char* color[3];
+    color[0] = minimal_mode ? CVT100_OUT(COLOR_VALUE_G) : CVT100_OUT(COLOR_VALUE_B);
+    color[1] = format       ? CVT100_OUT(COLOR_VALUE_G) : CVT100_OUT(COLOR_VALUE_B);
+    color[2] = tokenize     ? CVT100_OUT(COLOR_VALUE_G) : CVT100_OUT(COLOR_VALUE_B);
+    ZYAN_PRINTF("Minimal-Mode %s%d%s, Format %s%d%s, Tokenize %s%d%s, Instructions: %s%6.2fM%s," \
+        " Time: %s%8.2f%s msec\n",
+        color[0], minimal_mode, CVT100_OUT(COLOR_DEFAULT),
+        color[1], format, CVT100_OUT(COLOR_DEFAULT),
+        color[2], tokenize, CVT100_OUT(COLOR_DEFAULT),
+        CVT100_OUT(COLOR_VALUE_B), (double)count / 1000000, CVT100_OUT(COLOR_DEFAULT),
+        CVT100_OUT(COLOR_VALUE_G), GetCounter(), CVT100_OUT(COLOR_DEFAULT));
 }
 
-void generateTestData(FILE* file, uint8_t encoding)
+static void GenerateTestData(FILE* file, ZyanU8 encoding)
 {
     ZydisDecoder decoder;
-    if (!ZYDIS_SUCCESS(
+    if (!ZYAN_SUCCESS(
         ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64)))
     {
-        fputs("Failed to initialize decoder\n", stderr);
+        ZYAN_FPRINTF(ZYAN_STDERR, "%sFailed to initialize decoder%s\n", CVT100_ERR(COLOR_ERROR),
+            CVT100_ERR(ZYAN_VT100SGR_RESET));
         exit(EXIT_FAILURE);
     }
 
-    uint8_t last = 0;
-    uint32_t count = 0;
+    ZyanU8 last = 0;
+    ZyanU32 count = 0;
     ZydisDecodedInstruction instruction;
     while (count < 100000)
     {
-        uint8_t data[ZYDIS_MAX_INSTRUCTION_LENGTH];
+        ZyanU8 data[ZYDIS_MAX_INSTRUCTION_LENGTH];
         for (int i = 0; i < ZYDIS_MAX_INSTRUCTION_LENGTH; ++i)
         {
             data[i] = rand() % 256;
         }
-        const uint8_t offset = rand() % (ZYDIS_MAX_INSTRUCTION_LENGTH - 2);
+        const ZyanU8 offset = rand() % (ZYDIS_MAX_INSTRUCTION_LENGTH - 2);
         switch (encoding)
         {
         case 0:
@@ -278,15 +357,15 @@ void generateTestData(FILE* file, uint8_t encoding)
             data[offset    ] = 0x62;
             break;
         default:
-            ZYDIS_UNREACHABLE;
+            ZYAN_UNREACHABLE;
         }
-        if (ZYDIS_SUCCESS(ZydisDecoderDecodeBuffer(&decoder, data, sizeof(data), 0, &instruction)))
+        if (ZYAN_SUCCESS(ZydisDecoderDecodeBuffer(&decoder, data, sizeof(data), &instruction)))
         {
-            ZydisBool b = ZYDIS_FALSE;
+            ZyanBool b = ZYAN_FALSE;
             switch (encoding)
             {
             case 0:
-                b = (instruction.encoding == ZYDIS_INSTRUCTION_ENCODING_DEFAULT);
+                b = (instruction.encoding == ZYDIS_INSTRUCTION_ENCODING_LEGACY);
                 break;
             case 1:
                 b = (instruction.encoding == ZYDIS_INSTRUCTION_ENCODING_3DNOW);
@@ -305,18 +384,18 @@ void generateTestData(FILE* file, uint8_t encoding)
                 b = (instruction.encoding == ZYDIS_INSTRUCTION_ENCODING_MVEX);
                 break;
             default:
-                ZYDIS_UNREACHABLE;
+                ZYAN_UNREACHABLE;
             }
             if (b)
             {
-                fwrite(&instruction.data[0], 1, instruction.length, file);
+                fwrite(&data[0], sizeof(ZyanU8), instruction.length, file);
                 ++count;
 
-                const uint8_t p = (uint8_t)((double)count / 100000 * 100);
+                const ZyanU8 p = (ZyanU8)((double)count / 100000 * 100);
                 if (last < p)
                 {
                     last = p;
-                    printf("%3.0d%%\n", p);
+                    ZYAN_PRINTF("%3.0d%%\n", p);
                 }
 
             }
@@ -330,22 +409,31 @@ void generateTestData(FILE* file, uint8_t encoding)
 
 int main(int argc, char** argv)
 {
+    // Enable VT100 escape sequences on Windows, if the output is not redirected
+    g_vt100_stdout = (ZyanTerminalIsTTY(ZYAN_STDSTREAM_OUT) == ZYAN_STATUS_TRUE) &&
+                     ZYAN_SUCCESS(ZyanTerminalEnableVT100(ZYAN_STDSTREAM_OUT));
+    g_vt100_stderr = (ZyanTerminalIsTTY(ZYAN_STDSTREAM_ERR) == ZYAN_STATUS_TRUE) &&
+                     ZYAN_SUCCESS(ZyanTerminalEnableVT100(ZYAN_STDSTREAM_ERR));
+
     if (ZydisGetVersion() != ZYDIS_VERSION)
     {
-        fputs("Invalid zydis version\n", stderr);
+        ZYAN_FPRINTF(ZYAN_STDERR, "%sInvalid zydis version%s\n",
+            CVT100_ERR(COLOR_ERROR), CVT100_ERR(ZYAN_VT100SGR_RESET));
         return EXIT_FAILURE;
     }
 
-    if (argc < 3 || (strcmp(argv[1], "-test") && strcmp(argv[1], "-generate")))
+    if (argc < 3 || (ZYAN_STRCMP(argv[1], "-test") && ZYAN_STRCMP(argv[1], "-generate")))
     {
-        fputs("Usage: PerfTest -[test|generate] [directory]\n", stderr);
+        ZYAN_FPRINTF(ZYAN_STDERR, "%sUsage: %s -[test|generate] [directory]%s\n",
+            CVT100_ERR(COLOR_ERROR), (argc > 0 ? argv[0] : "PerfTest"),
+            CVT100_ERR(ZYAN_VT100SGR_RESET));
         return EXIT_FAILURE;
     }
 
-    ZydisBool generate = ZYDIS_FALSE;
-    if (!strcmp(argv[1], "-generate"))
+    ZyanBool generate = ZYAN_FALSE;
+    if (!ZYAN_STRCMP(argv[1], "-generate"))
     {
-        generate = ZYDIS_TRUE;
+        generate = ZYAN_TRUE;
     }
     const char* directory = argv[2];
 
@@ -370,14 +458,14 @@ int main(int argc, char** argv)
         srand((unsigned)time(&t));
     } else
     {
-        adjustProcessAndThreadPriority();
+        AdjustProcessAndThreadPriority();
     }
 
-    for (uint8_t i = 0; i < ZYDIS_ARRAY_SIZE(tests); ++i)
+    for (ZyanU8 i = 0; i < ZYAN_ARRAY_LENGTH(tests); ++i)
     {
         FILE* file;
 
-        const size_t len = strlen(directory);
+        const ZyanUSize len = strlen(directory);
         char buf[1024];
         strncpy(&buf[0], directory, sizeof(buf) - 1);
         if (generate)
@@ -389,14 +477,17 @@ int main(int argc, char** argv)
         }
         if (!file)
         {
-            fprintf(stderr, "Can not open file \"%s\": %s\n", &buf[0], strerror(errno));
+            ZYAN_FPRINTF(ZYAN_STDERR, "%sCould not open file \"%s\": %s%s\n",
+                CVT100_ERR(COLOR_ERROR), &buf[0], strerror(ZYAN_ERRNO),
+                CVT100_ERR(ZYAN_VT100SGR_RESET));
             continue;
         }
 
         if (generate)
         {
-            printf("Generating %s ...\n", tests[i].encoding);
-            generateTestData(file, i);
+            ZYAN_PRINTF("Generating %s%s%s ...\n", CVT100_OUT(COLOR_VALUE_B), tests[i].encoding,
+                CVT100_OUT(ZYAN_VT100SGR_RESET));
+            GenerateTestData(file, i);
         } else
         {
             fseek(file, 0L, SEEK_END);
@@ -404,24 +495,30 @@ int main(int argc, char** argv)
             void* buffer = malloc(length);
             if (!buffer)
             {
-                fprintf(stderr,
-                    "Failed to allocate %" PRIu64 " bytes on the heap", (uint64_t)length);
+                ZYAN_FPRINTF(ZYAN_STDERR,
+                    "%sFailed to allocate %" PRIu64 " bytes on the heap%s\n",
+                    CVT100_ERR(COLOR_ERROR), (ZyanU64)length, CVT100_ERR(ZYAN_VT100SGR_RESET));
                 goto NextFile2;
             }
 
             rewind(file);
-            if (fread(buffer, 1, length, file) != (size_t)length)
+            if (fread(buffer, 1, length, file) != (ZyanUSize)length)
             {
-                fprintf(stderr,
-                    "Could not read %" PRIu64 " bytes from file \"%s\"", (uint64_t)length, &buf[0]);
+                ZYAN_FPRINTF(ZYAN_STDERR,
+                    "%sCould not read %" PRIu64 " bytes from file \"%s\"%s\n",
+                    CVT100_ERR(COLOR_ERROR), (ZyanU64)length, &buf[0],
+                    CVT100_ERR(ZYAN_VT100SGR_RESET));
                 goto NextFile1;
             }
 
-            printf("Testing %s ...\n", tests[i].encoding);
-            testPerformance(buffer, length, ZYDIS_TRUE , ZYDIS_FALSE);
-            testPerformance(buffer, length, ZYDIS_FALSE, ZYDIS_FALSE);
-            testPerformance(buffer, length, ZYDIS_FALSE, ZYDIS_TRUE );
-            puts("");
+            ZYAN_PRINTF("%sTesting %s%s%s ...\n", CVT100_OUT(ZYAN_VT100SGR_FG_MAGENTA),
+                CVT100_OUT(ZYAN_VT100SGR_FG_BRIGHT_MAGENTA), tests[i].encoding,
+                CVT100_OUT(COLOR_DEFAULT));
+            TestPerformance(buffer, length, ZYAN_TRUE , ZYAN_FALSE, ZYAN_FALSE);
+            TestPerformance(buffer, length, ZYAN_FALSE, ZYAN_FALSE, ZYAN_FALSE);
+            TestPerformance(buffer, length, ZYAN_FALSE, ZYAN_TRUE , ZYAN_FALSE);
+            TestPerformance(buffer, length, ZYAN_FALSE, ZYAN_TRUE , ZYAN_TRUE );
+            ZYAN_PUTS("");
 
         NextFile1:
             free(buffer);

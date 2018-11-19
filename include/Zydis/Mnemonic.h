@@ -32,8 +32,8 @@
 #ifndef ZYDIS_MNEMONIC_H
 #define ZYDIS_MNEMONIC_H
 
-#include <Zydis/CommonTypes.h>
-#include <Zydis/String.h>
+#include <Zycore/Types.h>
+#include <Zydis/ShortString.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,24 +50,34 @@ extern "C" {
 /* ============================================================================================== */
 
 /**
+ * @addtogroup mnemonic Mnemonic
+ * @brief Functions for retrieving mnemonic names.
+ * @{
+ */
+
+/**
  * @brief   Returns the specified instruction mnemonic string.
  *
  * @param   mnemonic    The mnemonic.
  *
- * @return  The instruction mnemonic string or @c NULL, if an invalid mnemonic was passed.
+ * @return  The instruction mnemonic string or `ZYAN_NULL`, if an invalid mnemonic was passed.
  */
 ZYDIS_EXPORT const char* ZydisMnemonicGetString(ZydisMnemonic mnemonic);
 
 /**
- * @brief   Returns the specified instruction mnemonic as `ZydisStaticString`.
+ * @brief   Returns the specified instruction mnemonic as `ZydisShortString`.
  *
  * @param   mnemonic    The mnemonic.
  *
- * @return  The instruction mnemonic string or @c NULL, if an invalid mnemonic was passed.
+ * @return  The instruction mnemonic string or `ZYAN_NULL`, if an invalid mnemonic was passed.
  *
  * The `buffer` of the returned struct is guaranteed to be zero-terminated in this special case.
  */
-ZYDIS_EXPORT const ZydisStaticString* ZydisMnemonicGetStaticString(ZydisMnemonic mnemonic);
+ZYDIS_EXPORT const ZydisShortString* ZydisMnemonicGetStringWrapped(ZydisMnemonic mnemonic);
+
+/**
+ * @}
+ */
 
 /* ============================================================================================== */
 

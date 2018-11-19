@@ -32,21 +32,23 @@
 #ifndef ZYDIS_H
 #define ZYDIS_H
 
-#include <Zydis/CommonTypes.h>
+#include <Zycore/Defines.h>
+#include <Zycore/Types.h>
+
 #ifndef ZYDIS_DISABLE_DECODER
-#include <Zydis/Decoder.h>
-#include <Zydis/DecoderTypes.h>
+#   include <Zydis/Decoder.h>
+#   include <Zydis/DecoderTypes.h>
 #endif
-#include <Zydis/Defines.h>
+
 #ifndef ZYDIS_DISABLE_FORMATTER
-#include <Zydis/Formatter.h>
+#   include <Zydis/Formatter.h>
 #endif
+
 #include <Zydis/MetaInfo.h>
 #include <Zydis/Mnemonic.h>
 #include <Zydis/Register.h>
 #include <Zydis/SharedTypes.h>
 #include <Zydis/Status.h>
-#include <Zydis/String.h>
 #include <Zydis/Utils.h>
 
 #ifdef __cplusplus
@@ -64,7 +66,7 @@ extern "C" {
 /**
  * @brief   A macro that defines the zydis version.
  */
-#define ZYDIS_VERSION (ZydisU64)0x0002000000020000
+#define ZYDIS_VERSION (ZyanU64)0x0003000000000000
 
 /* ---------------------------------------------------------------------------------------------- */
 /* Helper macros                                                                                  */
@@ -75,28 +77,28 @@ extern "C" {
  *
  * @param   version The zydis version value
  */
-#define ZYDIS_VERSION_MAJOR(version) (ZydisU16)((version & 0xFFFF000000000000) >> 48)
+#define ZYDIS_VERSION_MAJOR(version) (ZyanU16)((version & 0xFFFF000000000000) >> 48)
 
 /**
  * @brief   Extracts the minor-part of the zydis version.
  *
  * @param   version The zydis version value
  */
-#define ZYDIS_VERSION_MINOR(version) (ZydisU16)((version & 0x0000FFFF00000000) >> 32)
+#define ZYDIS_VERSION_MINOR(version) (ZyanU16)((version & 0x0000FFFF00000000) >> 32)
 
 /**
  * @brief   Extracts the patch-part of the zydis version.
  *
  * @param   version The zydis version value
  */
-#define ZYDIS_VERSION_PATCH(version) (ZydisU16)((version & 0x00000000FFFF0000) >> 16)
+#define ZYDIS_VERSION_PATCH(version) (ZyanU16)((version & 0x00000000FFFF0000) >> 16)
 
 /**
  * @brief   Extracts the build-part of the zydis version.
  *
  * @param   version The zydis version value
  */
-#define ZYDIS_VERSION_BUILD(version) (ZydisU16)(version & 0x000000000000FFFF)
+#define ZYDIS_VERSION_BUILD(version) (ZyanU16)(version & 0x000000000000FFFF)
 
 /* ---------------------------------------------------------------------------------------------- */
 
@@ -105,22 +107,32 @@ extern "C" {
 /* ============================================================================================== */
 
 /**
- * @brief   Defines the @c ZydisFeature datatype.
+ * @brief   Defines the `ZydisFeature` enum.
  */
-typedef ZydisU8 ZydisFeature;
-
-/**
- * @brief   Values that represent zydis features.
- */
-enum ZydisFeatures
+typedef enum ZydisFeature_
 {
-    ZYDIS_FEATURE_EVEX,
-    ZYDIS_FEATURE_MVEX,
-};
+    ZYDIS_FEATURE_AVX512,
+    ZYDIS_FEATURE_KNC,
+
+    /**
+     * @brief   Maximum value of this enum.
+     */
+    ZYDIS_FEATURE_MAX_VALUE = ZYDIS_FEATURE_KNC,
+    /**
+     * @brief   The minimum number of bits required to represent all values of this enum.
+     */
+    ZYDIS_FEATURE_REQUIRED_BITS = ZYAN_BITS_TO_REPRESENT(ZYDIS_FEATURE_MAX_VALUE)
+} ZydisFeature;
 
 /* ============================================================================================== */
 /* Exported functions                                                                             */
 /* ============================================================================================== */
+
+/**
+ * @addtogroup version Version
+ * @brief Functions for checking the library version and build options.
+ * @{
+ */
 
 /**
  * @brief   Returns the zydis version.
@@ -130,16 +142,21 @@ enum ZydisFeatures
  * Use the macros provided in this file to extract the major, minor, patch and build part from the
  * returned version value.
  */
-ZYDIS_EXPORT ZydisU64 ZydisGetVersion(void);
+ZYDIS_EXPORT ZyanU64 ZydisGetVersion(void);
 
 /**
  * @brief   Checks, if the specified feature is enabled in the current zydis library instance.
  *
  * @param   feature The feature.
  *
- * @return  @c True if the feature is enabled, @c false if not.
+ * @return  `ZYAN_STATUS_TRUE` if the feature is enabled, `ZYAN_STATUS_FALSE` if not. Another
+ *          zyan status code, if an error occured.
  */
-ZYDIS_EXPORT ZydisBool ZydisIsFeatureEnabled(ZydisFeature feature);
+ZYDIS_EXPORT ZyanStatus ZydisIsFeatureEnabled(ZydisFeature feature);
+
+/**
+ * @}
+ */
 
 /* ============================================================================================== */
 

@@ -27,7 +27,7 @@
 #ifndef ZYDIS_INTERNAL_DECODERDATA_H
 #define ZYDIS_INTERNAL_DECODERDATA_H
 
-#include <Zydis/Defines.h>
+#include <Zycore/Defines.h>
 #include <Zydis/DecoderTypes.h>
 
 #ifdef __cplusplus
@@ -39,7 +39,7 @@ extern "C" {
 /* ============================================================================================== */
 
 // MSVC does not like types other than (un-)signed int for bitfields
-#ifdef ZYDIS_MSVC
+#ifdef ZYAN_MSVC
 #   pragma warning(push)
 #   pragma warning(disable:4214)
 #endif
@@ -51,9 +51,9 @@ extern "C" {
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the @c ZydisDecoderTreeNodeType datatype.
+ * @brief   Defines the `ZydisDecoderTreeNodeType` datatype.
  */
-typedef ZydisU8 ZydisDecoderTreeNodeType;
+typedef ZyanU8 ZydisDecoderTreeNodeType;
 
 /**
  * @brief   Values that represent zydis decoder tree node types.
@@ -160,20 +160,28 @@ enum ZydisDecoderTreeNodeTypes
     /**
      * @brief   Reference to a TZCNT-mode filter.
      */
-    ZYDIS_NODETYPE_FILTER_MODE_TZCNT        = 0x18
+    ZYDIS_NODETYPE_FILTER_MODE_TZCNT        = 0x18,
+    /**
+     * @brief   Reference to a WBNOINVD-mode filter.
+     */
+    ZYDIS_NODETYPE_FILTER_MODE_WBNOINVD     = 0x19,
+    /**
+     * @brief   Reference to a CLDEMOTE-mode filter.
+     */
+    ZYDIS_NODETYPE_FILTER_MODE_CLDEMOTE     = 0x1A
 };
 
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the @c ZydisDecoderTreeNodeValue datatype.
+ * @brief   Defines the `ZydisDecoderTreeNodeValue` datatype.
  */
-typedef ZydisU16 ZydisDecoderTreeNodeValue;
+typedef ZyanU16 ZydisDecoderTreeNodeValue;
 
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the @c ZydisDecoderTreeNode struct.
+ * @brief   Defines the `ZydisDecoderTreeNode` struct.
  */
 typedef struct ZydisDecoderTreeNode_
 {
@@ -185,7 +193,7 @@ typedef struct ZydisDecoderTreeNode_
 
 #pragma pack(pop)
 
-#ifdef ZYDIS_MSVC
+#ifdef ZYAN_MSVC
 #   pragma warning(pop)
 #endif
 
@@ -194,9 +202,9 @@ typedef struct ZydisDecoderTreeNode_
 /* ---------------------------------------------------------------------------------------------- */
 
 /**
- * @brief   Defines the @c ZydisInstructionEncodingFlags datatype.
+ * @brief   Defines the `ZydisInstructionEncodingFlags` datatype.
  */
-typedef ZydisU8 ZydisInstructionEncodingFlags;
+typedef ZyanU8 ZydisInstructionEncodingFlags;
 
 /**
  * @brief   The instruction has an optional modrm byte.
@@ -227,7 +235,7 @@ typedef ZydisU8 ZydisInstructionEncodingFlags;
 #define ZYDIS_INSTR_ENC_FLAG_FORCE_REG_FORM 0x10
 
 /**
- * @brief   Defines the @c ZydisInstructionEncodingInfo struct.
+ * @brief   Defines the `ZydisInstructionEncodingInfo` struct.
  */
 typedef struct ZydisInstructionEncodingInfo_
 {
@@ -243,7 +251,7 @@ typedef struct ZydisInstructionEncodingInfo_
         /**
          * @brief   The size of the displacement value.
          */
-        ZydisU8 size[3];
+        ZyanU8 size[3];
     } disp;
     /**
      * @brief   Immediate info.
@@ -253,15 +261,15 @@ typedef struct ZydisInstructionEncodingInfo_
         /**
          * @brief   The size of the immediate value.
          */
-        ZydisU8 size[3];
+        ZyanU8 size[3];
         /**
          * @brief   Signals, if the value is signed.
          */
-        ZydisBool isSigned;
+        ZyanBool is_signed;
         /**
          * @brief   Signals, if the value is a relative offset.
          */
-        ZydisBool isRelative;
+        ZyanBool is_relative;
     } imm[2];
 } ZydisInstructionEncodingInfo;
 
@@ -283,7 +291,7 @@ typedef struct ZydisInstructionEncodingInfo_
 ZYDIS_NO_EXPORT const ZydisDecoderTreeNode* ZydisDecoderTreeGetRootNode(void);
 
 /**
- * @brief   Returns the child node of @c parent specified by @c index.
+ * @brief   Returns the child node of `parent` specified by `index`.
  *
  * @param   parent  The parent node.
  * @param   index   The index of the child node to retrieve.
@@ -291,14 +299,14 @@ ZYDIS_NO_EXPORT const ZydisDecoderTreeNode* ZydisDecoderTreeGetRootNode(void);
  * @return  The specified child node.
  */
 ZYDIS_NO_EXPORT const ZydisDecoderTreeNode* ZydisDecoderTreeGetChildNode(
-    const ZydisDecoderTreeNode* parent, ZydisU16 index);
+    const ZydisDecoderTreeNode* parent, ZyanU16 index);
 
 /**
  * @brief   Returns information about optional instruction parts (like modrm, displacement or
- *          immediates) for the instruction that is linked to the given @c node.
+ *          immediates) for the instruction that is linked to the given `node`.
  *
  * @param   node    The instruction definition node.
- * @param   info    A pointer to the @c ZydisInstructionParts struct.
+ * @param   info    A pointer to the `ZydisInstructionParts` struct.
  */
 ZYDIS_NO_EXPORT void ZydisGetInstructionEncodingInfo(const ZydisDecoderTreeNode* node,
     const ZydisInstructionEncodingInfo** info);
